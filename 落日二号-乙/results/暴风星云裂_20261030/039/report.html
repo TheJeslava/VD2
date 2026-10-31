@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261030-224955-133a63</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261030-224955-133a63 · 生成时间: 2026-10-30T14:50:32.788011+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\039.zip · SHA256: dcd627aba47edb36b6b02995d92ae6b47ea38157489be6bc6bc3ad973f56f1e9</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：039.php 中 $_POST[&#x27;id&#x27;] 直接拼接进 SQL 查询（MySQL/SQLite 双分支），类型 sql_injection，严重度 high，已附 POC（HTTP 型，可动态复现，仅限授权测试）。这是本次唯一且最高危的问题，参数到汇点路径极短（单文件内联）。POC 齐全度：1/1 有 POC。未发现二次注入链。需注意：本次 min_severity=high、suppressed_count=0，但 surface_notes 列出的 weak_hash/weak_crypto/weak_random/insecure_cookie/trust_boundary 等仅为待人工确认项，未形成 finding，不能据此宣称不存在。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>sql_injection</code></td><td>DVWA SQL 注入页面 039.php 中 $_POST[&#x27;id&#x27;] 直接拼接进 SQL 查询（MySQL/SQLite 双分支）</td><td><code>039.php:36</code></td><td>0.9</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-a6c26ade848b'><h2>F-1 DVWA SQL 注入页面 039.php 中 $_POST[&#x27;id&#x27;] 直接拼接进 SQL 查询（MySQL/SQLite 双分支）</h2><p><span class='sev sev-high'>high</span> <code>sql_injection</code> / CWE-89 · 置信度 0.9 · candidate / llm_inferred</p><p><b>位置：</b><code>039.php:5-36</code></p><p>039.php 在收到 POST 参数 Submit 后，直接把 $_POST[&#x27;id&#x27;] 赋给 $id（第 5 行）。MySQL 分支只对 $id 调用 mysqli_real_escape_string（第 10 行），但该函数只转义字符串字面量中的引号，不改变数字上下文；随后 $id 被无引号地拼进 &quot;SELECT first_name, last_name FROM users WHERE user_id = $id;&quot;（第 13 行）并交给 mysqli_query 执行（第 15 行）。由于 user_id 位置没有引号包裹，攻击者可注入任意 SQL 片段（如 1 UNION SELECT user,password FROM users、布尔/时间盲注），无需闭合引号即可绕过 mysqli_real_escape_string。SQLITE 分支（第 34-36 行）完全没有做任何转义，直接把 $id 拼进同样的查询并执行 $sqlite_db_connection-&gt;query($query)，注入更直接。查询结果通过 mysqli_num_rows / fetchArray 影响 $exists，进而决定页面回显 &#x27;User ID exists&#x27; 或 &#x27;User ID is MISSING&#x27;（第 45-50 行），构成可观测的布尔型注入通道，可用于逐字符外带数据库内容（如 users 表中的口令哈希）。</p><p><b>影响：</b>未认证攻击者可读取数据库中任意表数据（包括 users 表的用户名与口令哈希），并可进一步通过盲注枚举 schema、拖库；在数据库权限较高时可结合文件读写/堆叠查询扩大影响。</p><p><b>CVE/CWE 论证：</b>CWE-89 SQL 注入。外部可达（HTTP POST 参数 id），脚本无认证校验，source→sink 链完整闭合，mysqli_real_escape_string 在数字上下文下不构成有效防护，SQLite 分支完全无防护。</p><p><b>修复建议：</b>改用预处理语句（mysqli_prepare / bind_param 或 PDO prepared statement），将 user_id 作为整型参数绑定；对 id 做 intval 强制类型转换并校验范围；SQLite 分支同样使用参数化查询；移除字符串拼接。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>039.php:3</code></td><td>判断是否提交了 Submit，进入注入处理分支</td><td>请求进入处理逻辑</td><td></td></tr><tr><td>2</td><td><code>039.php:5</code></td><td>从 POST 读取 id 参数赋给 $id，无类型/白名单校验</td><td>攻击者完全可控的字符串</td><td></td></tr><tr><td>3</td><td><code>039.php:10</code></td><td>MySQL 分支对 $id 调用 mysqli_real_escape_string，仅转义引号等字符</td><td>仍含 SQL 元字符（空格、UNION、注释符、括号、比较符等）</td><td>user_id = $id 中 $id 未加引号，处于数字上下文；mysqli_real_escape_string 不转义空格、UNION、--、括号等，无法阻止数字型注入</td></tr><tr><td>4</td><td><code>039.php:13</code></td><td>将 $id 直接拼接进 SELECT 语句</td><td>恶意 SQL 片段进入查询字符串</td><td></td></tr><tr><td>5</td><td><code>039.php:15</code></td><td>mysqli_query 执行拼接后的查询</td><td>数据库执行攻击者构造的 SQL</td><td></td></tr><tr><td>6</td><td><code>039.php:34-36</code></td><td>SQLITE 分支同样直接拼接并执行，且完全无转义</td><td>恶意 SQL 片段进入 SQLite 查询</td><td>该分支没有任何转义或参数化</td></tr><tr><td>7</td><td><code>039.php:45-50</code></td><td>根据查询结果行数决定回显 exists / MISSING，形成布尔盲注观测通道</td><td>查询结果映射为页面文本</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /039.php（POST）的 SQL 注入 POC。注入点为 POST 参数 id，该参数在 039.php:36 附近被拼接进 SQL 查询；payload 使用 TARGET 占位符，仅作文本工件，不执行。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/039.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/039.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;id=%27%20OR%20%271%27%3D%271&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/039.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;id=%27%20OR%20%271%27%3D%271&#x27;
+</pre><h4>request.http</h4><pre>POST /039.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 28
+
+id=%27%20OR%20%271%27%3D%271
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

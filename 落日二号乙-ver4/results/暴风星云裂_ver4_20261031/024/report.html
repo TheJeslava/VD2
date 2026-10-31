@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-164313-273e41</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-164313-273e41 · 生成时间: 2026-10-31T08:44:11.463618+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\024.zip · SHA256: a2013a4944c4a1abb5e6dc291bf1a235fbddea2e99f978d43092c691e46798f1</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>4</b>findings</div>
+<div class="metric"><b>4</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次审计对象为单文件 PHP 脚本 024.php（37 行），共交付 4 条去重后 finding，全部带 POC（4/4）。最高危为 024.php 第 19 行附近的密码修改功能 SQL 注入（critical，CWE-89，规则检出，有 HTTP POC）；其次为同一接口仅以 HTTP_REFERER 做来源校验导致的 CSRF 账户接管（high，LLM 推断，有 HTTP POC）与口令修改接口缺乏暴力破解防护（high，CWE-307，有 HTTP POC）。另有一条 medium 级弱哈希问题：024.php 第 14 行使用 MD5 存储口令，注意其正确归类应为 weak_hash（CWE-328），输入中标记为 weak_crypto，属类型标注偏差，需在交付时纠正；该条仅有静态证据 POC，不能宣称可动态复现。所有结论均为源码/规则层面的静态推断，未做任何动态验证。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>024.php 密码修改功能 SQL 注入（CWE-89）</td><td><code>024.php:19</code></td><td>0.4</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-high'>high</span></td><td><code>csrf</code></td><td>DVWA 密码修改接口仅用 HTTP_REFERER 做来源校验，可被 CSRF 绕过并接管账户</td><td><code>024.php:19</code></td><td>0.85</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-high'>high</span></td><td><code>brute_force</code></td><td>024.php 口令修改接口缺乏暴力破解防护（CWE-307）</td><td><code>024.php:7</code></td><td>0.4</td><td>是</td></tr><tr><td>4</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>024.php 使用 MD5 存储口令（CWE-328 弱哈希）</td><td><code>024.php:14</code></td><td>0.8</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-cf38b1a2cb95'><h2>F-1 024.php 密码修改功能 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.4 · candidate / rule_verified+llm</p><p><b>位置：</b><code>024.php:17-19</code></p><p>攻击者通过 GET 参数 password_new（024.php:7 `$pass_new = $_GET[&#x27;password_new&#x27;]`）提交输入。该值在 024.php:13 仅经过 mysqli_real_escape_string 转义，随后在 024.php:14 被 md5() 处理，再于 024.php:18 直接拼接进 UPDATE 语句：`$insert = &quot;UPDATE `users` SET password = &#x27;$pass_new&#x27; WHERE user = &#x27;&quot; . $current_user . &quot;&#x27;;&quot;`，最终在 024.php:19 交给 mysqli_query 执行。关键点在于：md5() 会把输入转换为 32 位十六进制字符串，因此 password_new 中的引号、注释符等 SQL 元字符在进入拼接前已被哈希消解，无法闭合 024.php:18 中的单引号，password_new 这一路径实际不可注入。真正未经过滤的是 024.php:18 中拼接的 $current_user（来自 024.php:17 dvwaCurrentUser()），但该值来源于会话/用户表而非本次请求参数，输入中未提供其可控证据。因此本条候选的污点链在 md5 处断裂，证据不足以确认可利用的 SQL 注入。</p><p><b>影响：</b>若成立，可导致 users 表任意改写（含其他账户口令重置）、数据库内容泄露或通过报错信息（024.php:19 的 mysqli_error 回显）获取库结构。但基于现有代码，password_new 路径被 md5 消解，实际影响无法确认。</p><p><b>CVE/CWE 论证：</b>CWE-89。外部可达性：024.php 为 DVWA 口令修改页面，GET 参数无需认证即可提交（取决于部署的会话校验）。但利用链未闭合：source（password_new）在到达 sink 前被 md5() 转换为定长十六进制串，无法注入 SQL 元字符；$current_user 的可控性缺乏证据。故不满足「无需认证 + 利用链闭合」的 CVE 论证条件。</p><p><b>修复建议：</b>即便当前 md5 掩盖了注入，也应修复根因：改用预处理语句（mysqli_prepare + bind_param）绑定 password 与 user 参数，禁止字符串拼接；对 $current_user 同样参数化；关闭 024.php:19 的 mysqli_error 回显，改为记录日志并返回通用错误；同时将 md5 替换为 password_hash()（PASSWORD_BCRYPT/ARGON2）。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>024.php:7</code></td><td>从 query `password_new` 读取外部输入</td><td>污点进入 insert</td><td></td></tr><tr><td>2</td><td><code>024.php:19</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;],  $insert ) or die( &#x27;&lt;pre&gt;&#x27; . ((is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_error($GLOBALS[&quot;___mysqli_ston&quot;]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . &#x27;&lt;/pre&gt;&#x27; );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /024（GET）的 SQL 注入 POC。注入点：GET 参数 password_new；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/024&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/024?password_new=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/024?password_new=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>GET /024 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 52
+
+password_new=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-3eef1cf779fd'><h2>F-2 DVWA 密码修改接口仅用 HTTP_REFERER 做来源校验，可被 CSRF 绕过并接管账户</h2><p><span class='sev sev-high'>high</span> <code>csrf</code> / CWE-352 · 置信度 0.85 · candidate / llm_inferred</p><p><b>位置：</b><code>024.php:3-19</code></p><p>024.php 在收到 `Change` 参数时执行密码修改：读取 `password_new`/`password_conf`（第7-8行），比较一致后 md5 并 UPDATE 当前用户密码（第14-19行）。唯一的“来源校验”是第5行 `stripos($_SERVER[&#x27;HTTP_REFERER&#x27;], $_SERVER[&#x27;SERVER_NAME&#x27;]) !== false`，即只要 Referer 字符串中任意位置包含服务器名即通过。攻击者可构造 Referer 包含目标域名的页面（如 `http://attacker.com/?TARGET` 或子串包含），或利用 Referer 缺失/可控场景，诱导已登录受害者访问，从而在无 CSRF token 的情况下修改其密码，实现账户接管。</p><p><b>影响：</b>攻击者可在受害者不知情下修改其账户密码，实现账户接管。</p><p><b>CVE/CWE 论证：</b>CWE-352 跨站请求伪造：密码修改操作无 CSRF token，仅依赖可伪造的 Referer 子串校验，外部可触发。</p><p><b>修复建议：</b>引入随机 CSRF token 并在服务端校验；不要依赖 Referer 做安全判断；密码修改要求重新输入旧密码。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>024.php:3</code></td><td>检测到 Change 参数即进入密码修改逻辑</td><td>攻击者控制请求参数</td><td></td></tr><tr><td>2</td><td><code>024.php:5</code></td><td>仅用 stripos 判断 Referer 是否包含 SERVER_NAME，可被伪造/子串绕过</td><td>Referer 字符串包含目标域名即通过</td><td>stripos 子串匹配，攻击者页面 URL 或 Referer 中带目标域名即可通过；无 CSRF token</td></tr><tr><td>3</td><td><code>024.php:7-8</code></td><td>读取新密码与确认密码</td><td>攻击者指定新密码</td><td></td></tr><tr><td>4</td><td><code>024.php:11-14</code></td><td>两次密码一致后 md5 处理</td><td>md5(password)</td><td></td></tr><tr><td>5</td><td><code>024.php:17-19</code></td><td>以当前登录用户身份执行 UPDATE 修改密码</td><td>SQL 更新 users.password</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /024.php（GET）的 跨站请求伪造 POC。注入点：GET 参数 Change；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/024.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 跨站请求伪造 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/024.php?Change=Change&amp;password_new=SUNSET_NEW&amp;password_conf=SUNSET_NEW&#x27;</pre><div class='muted'>预期：状态改变请求被接受或进入下一步流程</div></li><li><b>读取账户状态/重新登录确认状态确实改变</b><div class='muted'>预期：密码或业务状态已改变；请求无需 CSRF token/有效验证码</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/024.php?Change=Change&amp;password_new=SUNSET_NEW&amp;password_conf=SUNSET_NEW&#x27;
+</pre><h4>request.http</h4><pre>GET /024.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 62
+
+Change=Change&amp;password_new=SUNSET_NEW&amp;password_conf=SUNSET_NEW
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-72b85cc24676'><h2>F-3 024.php 口令修改接口缺乏暴力破解防护（CWE-307）</h2><p><span class='sev sev-high'>high</span> <code>brute_force</code> / CWE-307 · 置信度 0.4 · candidate / rule_verified+llm</p><p><b>位置：</b><code>024.php:6-7</code></p><p>024.php:6-8 直接从 $_GET 读取 password_new / password_conf，代码片段中未见失败计数、账户锁定、速率限制、验证码或 CSRF 令牌等任何防护措施。攻击者可对同一端点高频重复请求，尝试猜测或枚举口令/账户。需说明：该页面为口令修改而非登录校验，输入中未提供会话校验与限流中间件的证据，因此「可被用于在线爆破」的结论依赖部署环境，属推断。</p><p><b>影响：</b>若端点可被匿名高频调用，攻击者可进行口令猜测、账户枚举与资源消耗型拒绝服务；结合弱哈希（SEM-23ce27f2da1c）可放大离线破解收益。</p><p><b>CVE/CWE 论证：</b>CWE-307（Improper Restriction of Excessive Authentication Attempts）。外部可达性：GET 端点无需额外权限即可访问（取决于会话校验）。但利用链未闭合：输入未提供限流/锁定缺失的运行时确认，也未证明该端点直接承担认证判定，故仅作推断级结论。</p><p><b>修复建议：</b>在认证/口令修改流程引入失败计数与指数退避、账户/IP 维度速率限制、必要时验证码；为表单加入 CSRF 令牌并校验会话；记录并告警异常高频请求；口令策略强制最小长度与复杂度。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>024.php:7</code></td><td>登录流程未见失败计数、锁定或速率限制；需授权环境重复请求确认</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>针对 /024（GET）的 暴力破解防护缺失 POC。注入点：GET 参数 password_new；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/024&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送第一次错误登录请求并记录状态、延迟和响应</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/024?Login=Login&amp;username=admin&amp;password=wrong&#x27;</pre><div class='muted'>预期：登录失败响应</div></li><li><b>在短时间内重复 5 次以上错误登录</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/024?Login=Login&amp;username=admin&amp;password=wrong&#x27;</pre><div class='muted'>预期：无锁定、无速率限制、无递增延迟或验证码触发</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/024?Login=Login&amp;username=admin&amp;password=wrong&#x27;
+</pre><h4>request.http</h4><pre>GET /024 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 41
+
+Login=Login&amp;username=admin&amp;password=wrong
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-23ce27f2da1c'><h2>F-4 024.php 使用 MD5 存储口令（CWE-328 弱哈希）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.8 · candidate / rule_verified+llm</p><p><b>位置：</b><code>024.php:13-14</code></p><p>024.php:14 执行 `$pass_new = md5( $pass_new );`，将用户新口令以无盐 MD5 单轮哈希后写入 users 表（024.php:18-19）。MD5 属快速哈希，抗碰撞与抗暴力能力均不足，且此处未加盐、未使用迭代 KDF。攻击者一旦通过数据库泄露、备份或 SQL 注入读取到哈希值，可用彩虹表/GPU 离线爆破在极短时间内还原常见口令。注意：该弱点本质是弱哈希（CWE-328），而非弱加密算法（CWE-327）。</p><p><b>影响：</b>口令哈希可被离线快速破解，导致账户接管；相同口令产生相同哈希，便于横向撞库与用户枚举。</p><p><b>CVE/CWE 论证：</b>CWE-328（Use of Weak Hash）。配置/实现型弱点，无需 HTTP 污点链即可成立：算法名与调用点（024.php:14 md5）为原文证据。外部可达性：任何通过该页面设置口令的用户都会生成 MD5 哈希，无需特殊权限。</p><p><b>修复建议：</b>改用 password_hash($pass_new, PASSWORD_DEFAULT)（bcrypt/Argon2id）生成带盐、可调成本的哈希，校验用 password_verify()；对历史 MD5 记录在用户下次登录时透明升级；禁止在 SQL 中直接拼接哈希值，配合预处理语句。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>024.php:14</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型弱哈希问题：024.php:14 使用 md5() 对密码 $pass_new 做哈希后存储，MD5 属弱哈希算法，易被彩虹表/暴力破解。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 024.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 024.php
+- 行号: 14
+- 片段:
+```
+13: 			$pass_new = ((isset($GLOBALS[&quot;___mysqli_ston&quot;]) &amp;&amp; is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_real_escape_string($GLOBALS[&quot;___mysqli_ston&quot;],  $pass_new ) : ((trigger_error(&quot;[MySQLConverterToo] Fix the mysql_escape_string() call! This code does not work.&quot;, E_USER_ERROR)) ? &quot;&quot; : &quot;&quot;));
+14: 			$pass_new = md5( $pass_new );
+15: 
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

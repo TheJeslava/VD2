@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-163937-79462a</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-163937-79462a · 生成时间: 2026-10-31T08:40:29.698198+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\010.zip · SHA256: 819467f4e89f5ccb8366890305cd0e83be79b38873b4535d43cf0f2c08e7c6c7</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>3</b>findings</div>
+<div class="metric"><b>3</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总 3 条已去重 findings，全部集中在单文件 PHP 脚本 010.php（43 行）：最高危为 GEN-7034f0a19983 登录查询 SQL 注入（critical，CWE-89，第 20 行附近），其次为 SEM-949d40928ae7 口令 MD5 弱哈希（medium，第 16 行，实为 CWE-328 弱哈希而非弱加密）与 LLM-f803c7aea6a6 登录成功页反射型 XSS（medium，第 28 行，username 未转义拼入 HTML）。3 条均带 POC：SQL 注入与 XSS 为 HTTP 型 POC（目标以 TARGET 占位，仅限授权测试），MD5 弱哈希为静态证据 POC，不能宣称可动态复现。未发现二次注入链。整体攻击面为无框架、无路由清单的独立 PHP 页面，source 与 sink 同处一个短文件，污点链路极短。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>010.php 登录查询 SQL 注入（CWE-89）</td><td><code>010.php:20</code></td><td>0.73</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>010.php 口令使用 MD5 哈希（CWE-328 弱哈希）</td><td><code>010.php:16</code></td><td>0.76</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-medium'>medium</span></td><td><code>xss</code></td><td>010.php 登录成功页反射型 XSS：username 参数未转义直接拼入 HTML</td><td><code>010.php:28</code></td><td>0.75</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-7034f0a19983'><h2>F-1 010.php 登录查询 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.73 · candidate / rule_verified+llm</p><p><b>位置：</b><code>010.php:18-20</code></p><p>攻击者通过 HTTP 请求参数 `username`（010.php:8 读取）提交任意字符串，该值被直接拼进 010.php:19 的 SQL 语句 `SELECT * FROM `users` WHERE user = &#x27;$user&#x27; AND password = &#x27;$pass&#x27;;`，随后在 010.php:20 由 mysqli_query 执行。代码中仅对 `$pass` 调用了 mysqli_real_escape_string（010.php:15），`$user` 未做任何转义、白名单或参数化处理，因此单引号可闭合 `user = &#x27;...&#x27;` 字面量，注入任意 SQL 片段（如 `&#x27; OR &#x27;1&#x27;=&#x27;1` 绕过认证，或 UNION 读取其他表）。校验无效的根因是字符串拼接构造 SQL 且 `$user` 完全未净化。</p><p><b>影响：</b>可绕过登录认证并以数据库连接账号权限读取/篡改 users 表及其他可访问表的数据（凭据泄露、越权登录）；若数据库账号权限较高，还可进一步读写文件或扩展影响。错误信息经 die(mysqli_error(...)) 回显，便于注入调试与数据回显。</p><p><b>CVE/CWE 论证：</b>CWE-89（SQL 注入）。外部可达性：注入点为 HTTP 请求参数 `username`，无需认证即可访问登录逻辑；利用链闭合：010.php:8 读取参数 → 010.php:19 字符串拼接 → 010.php:20 mysqli_query 执行，中间无有效净化（`$user` 未转义、未参数化）。证据等级为源码推断（llm_inferred），未做动态验证。</p><p><b>修复建议：</b>改用预处理语句与参数绑定（mysqli_prepare + bind_param 或 PDO prepared statement），彻底避免字符串拼接；对 `username` 做长度与字符白名单校验；移除 die(mysqli_error(...)) 的详细错误回显，改为记录日志并返回通用错误；数据库账号遵循最小权限，仅授予业务所需表的必要权限。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>010.php:8</code></td><td>从 query `username` 读取外部输入</td><td>污点进入 query</td><td></td></tr><tr><td>2</td><td><code>010.php:20</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;],  $query ) or die( &#x27;&lt;pre&gt;&#x27; . ((is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_error($GLOBALS[&quot;___mysqli_ston&quot;]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . &#x27;&lt;/pre&gt;&#x27; );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /010（GET）的 SQL 注入 POC。注入点为 GET 参数 username（源码 010.php:20 附近将 username 拼入 SQL 查询），payload 使用 TARGET 占位符，仅限授权测试。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/010&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/010?username=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/010?username=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>GET /010 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 48
+
+username=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-949d40928ae7'><h2>F-2 010.php 口令使用 MD5 哈希（CWE-328 弱哈希）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.76 · candidate / rule_verified+llm</p><p><b>位置：</b><code>010.php:15-16</code></p><p>010.php:16 对用户口令执行 `$pass = md5( $pass );`，即使用 MD5 这一已被证明存在碰撞且计算速度极快的算法处理口令。该哈希值随后在 010.php:19 被拼入登录查询用于口令比对，说明 MD5 被用于安全用途（口令存储/校验）。MD5 无盐、无迭代、无慢哈希特性，攻击者一旦获取哈希即可通过彩虹表或高速暴力破解还原口令。此处属于弱哈希（CWE-328），而非加密算法误用（CWE-327）。</p><p><b>影响：</b>口令哈希泄露后可被快速离线破解，导致用户账户被接管；相同口令产生相同哈希，便于批量撞库与横向扩散。</p><p><b>CVE/CWE 论证：</b>CWE-328（使用弱哈希算法）。配置/实现型弱点，无需 HTTP 污点链即可成立；证据为 010.php:16 的 `md5( $pass )` 原文调用，且该值在 010.php:19 用于口令比对，属安全用途。外部可达性：登录接口对外暴露，攻击者可通过其他途径（如 SQL 注入、备份泄露）获取哈希后离线破解。证据等级为源码推断（llm_inferred）。</p><p><b>修复建议：</b>改用专为口令设计的慢哈希算法，如 PHP 的 password_hash()（PASSWORD_BCRYPT 或 PASSWORD_ARGON2ID）配合 password_verify() 校验；为每个口令使用独立随机盐；设定合理的工作因子；对历史 MD5 口令在用户下次登录时透明升级为强哈希。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>010.php:16</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC：010.php:16 使用 md5($pass) 对密码做哈希，属弱哈希（CWE-328），无需发送请求，仅做源码审查记录。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 010.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 010.php
+- 行号: 16
+- 片段:
+```
+15: 	$pass = ((isset($GLOBALS[&quot;___mysqli_ston&quot;]) &amp;&amp; is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_real_escape_string($GLOBALS[&quot;___mysqli_ston&quot;],  $pass ) : ((trigger_error(&quot;[MySQLConverterToo] Fix the mysql_escape_string() call! This code does not work.&quot;, E_USER_ERROR)) ? &quot;&quot; : &quot;&quot;));
+16: 	$pass = md5( $pass );
+17: 
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-f803c7aea6a6'><h2>F-3 010.php 登录成功页反射型 XSS：username 参数未转义直接拼入 HTML</h2><p><span class='sev sev-medium'>medium</span> <code>xss</code> / CWE-79 · 置信度 0.75 · candidate / llm_inferred</p><p><b>位置：</b><code>010.php:8-28</code></p><p>脚本在 `$_GET[&#x27;Login&#x27;]` 存在时读取 `$_GET[&#x27;username&#x27;]`（第 8 行），仅做 stripslashes 与 mysqli_real_escape_string（第 9-10 行），这两者只针对 SQL 上下文，不做 HTML 转义。登录成功后第 28 行将 `$user` 直接拼入 `$html .= &quot;&lt;p&gt;Welcome to the password protected area {$user}&lt;/p&gt;&quot;`，随后输出到页面，构成反射型 XSS。攻击者可构造带脚本的 username，诱导受害者点击链接，在目标域执行任意 JS，窃取会话或发起 CSRF 操作。</p><p><b>影响：</b>在目标域执行任意 JS，可窃取会话 Cookie、发起 CSRF、钓鱼</p><p><b>CVE/CWE 论证：</b>CWE-79 反射型 XSS；外部 GET 可达，需有效凭据但凭据可被受害者自身持有，链闭合</p><p><b>修复建议：</b>输出前使用 htmlspecialchars($user, ENT_QUOTES, &#x27;UTF-8&#x27;) 转义</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>010.php:8</code></td><td>从 $_GET[&#x27;username&#x27;] 读取用户输入到 $user</td><td>原始攻击者字符串</td><td></td></tr><tr><td>2</td><td><code>010.php:9-10</code></td><td>stripslashes 与 mysqli_real_escape_string 处理，仅针对 SQL 上下文，不改变 HTML 元字符</td><td>仍含 &lt; &gt; &quot; 等 HTML 元字符</td><td>mysqli_real_escape_string 只转义 SQL 特殊字符，不转义 HTML</td></tr><tr><td>3</td><td><code>010.php:28</code></td><td>登录成功后 $user 直接拼入 HTML 段落</td><td>未转义 HTML 片段</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /010.php（GET）的反射型 XSS POC。注入点为 GET 参数 username（源码 010.php:28 附近将 username 未编码输出到响应），payload 使用 TARGET 占位符，仅限授权测试。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/010.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 跨站脚本 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/010.php?username=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&#x27;</pre><div class='muted'>预期：响应中脚本未编码，浏览器执行并弹出 document.domain。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/010.php?username=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&#x27;
+</pre><h4>request.http</h4><pre>GET /010.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 62
+
+username=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

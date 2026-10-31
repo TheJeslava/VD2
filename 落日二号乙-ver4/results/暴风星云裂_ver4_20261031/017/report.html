@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-164138-27b16a</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-164138-27b16a · 生成时间: 2026-10-31T08:42:18.270149+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\017.zip · SHA256: 22eb1c366ca6de367dfb32771c8d253b8bddb6e1e510d5d40c62a409823cb0bf</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：017.php 中 xor_this() 以 XOR 作为加密原语（weak_crypto / CWE-327，medium，origin=rule），已附带 POC，但该 POC 属静态证据型（算法/实现层面），不具备 HTTP 动态复现语义，不能宣称可动态验证。最高危项即此条 medium 弱加密实现问题。POC 齐全度：1/1 有 POC，但均为静态 POC。攻击面测绘指出 017.php 同时存在 source 热点（约第 9 行）与 sink 热点（约第 1 行），可能构成注入/文件操作类风险，但该方向没有任何 finding 覆盖，且输入未提供代码文本，只能作为人工复核项，不得视为已排除。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>017.php 中 xor_this() 使用 XOR 作为加密原语（CWE-327）</td><td><code>017.php:3</code></td><td>0.55</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='SEM-2e4335a5c995'><h2>F-1 017.php 中 xor_this() 使用 XOR 作为加密原语（CWE-327）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.55 · candidate / rule_verified+llm</p><p><b>位置：</b><code>017.php:2-3</code></p><p>证据仅覆盖 017.php 第 2-4 行：第 3 行定义了 `function xor_this($cleartext, $key)`，第 4 行是注释 `// Our output text`。该函数以调用方提供的 `$key` 对 `$cleartext` 做逐字节 XOR 变换，属于自制的流式异或“加密”。XOR 本身不是分组/流密码算法，不具备密钥扩展、IV/nonce、完整性校验，密钥重用下可被已知明文直接恢复密钥流（C1⊕C2 = P1⊕P2），因此不满足 CWE-327 所要求的密码学强度。攻击者输入面：任何调用 xor_this() 的上层入口（HTTP 参数、Cookie、配置文件值）传入的 `$cleartext` 与 `$key`；由于 code_pack 只给出第 2-4 行，调用点、密钥来源、保护对象（口令/令牌/配置密文）均无法确认，属于证据缺口。校验无效的原因：函数体内没有任何密钥管理、随机化或认证逻辑，XOR 的可逆性与线性使其在密钥复用或已知明文场景下不提供机密性。最终危险操作：将 XOR 结果当作“密文”输出/存储（第 4 行注释所指的 output text），使受保护数据可被离线还原。</p><p><b>影响：</b>机密性丧失：若 xor_this() 用于保护凭据、会话令牌或配置中的敏感值，攻击者获取到密文后可通过已知明文攻击或密钥重用直接还原明文，进而冒用身份或读取受保护数据。由于缺少调用点证据，具体受影响数据对象（口令/令牌/配置文件）证据不足，不能断言 RCE 或越权。</p><p><b>CVE/CWE 论证：</b>CWE-327（Use of a Broken or Risky Cryptographic Algorithm）。外部可达性：取决于 xor_this() 的调用方，code_pack 未提供调用点，证据不足；无需认证的前提同样无法从第 2-4 行确认。利用链闭合度：仅闭合到“弱算法原语存在”这一环，缺少 source（外部输入入口）与受保护资产两环，故按 llm_inferred 记录，不主张完整可利用链。</p><p><b>修复建议：</b>1) 废弃 xor_this()，改用 libsodium（PHP 的 sodium_crypto_secretbox / sodium_crypto_aead_xchacha20poly1305_ietf_encrypt）或 OpenSSL 的 AES-256-GCM，提供机密性与完整性；2) 每次加密使用 CSPRNG 生成随机 nonce/IV（random_bytes()），并与密文一同存储；3) 密钥由 KMS/密钥库管理，禁止硬编码或从用户输入取 `$key`；4) 若历史数据已用 XOR 加密，制定一次性重加密迁移方案并轮换密钥；5) 对存量密文做密钥复用检测。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>017.php:3</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC：在 `017.php:3` 处定义了一个自定义 XOR 加密函数 `xor_this($cleartext, $key)`，该函数使用重复密钥 XOR 作为“加密”手段。XOR 属于可逆的弱混淆算法，不提供机密性保障（已知明文即可恢复密钥流，密钥复用可被频率分析/ crib-dragging 破解），属于 CWE-327 弱加密算法使用。本 POC 为离线源码审查证据，不发送任何请求。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 017.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 017.php
+- 行号: 3
+- 片段:
+```
+2: 
+3: function xor_this($cleartext, $key) {
+4:     // Our output text
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

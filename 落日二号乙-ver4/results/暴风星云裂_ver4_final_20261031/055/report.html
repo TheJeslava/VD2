@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-173421-65b246</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-173421-65b246 · 生成时间: 2026-10-31T09:34:55.800733+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\055.zip · SHA256: 3e6e2cddd55f2250b6f1a0ec122303bfa0c923af602a09aecf8d75ca2f525ece</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：055.php 留言板 INSERT 语句 SQL 注入（CWE-89，critical，规则命中，带 POC），是当前最高危且唯一交付项。该文件为 24 行单文件 PHP 脚本，source 热点在 055.php:3、sink 热点在 055.php:1，属短链路污点传播，与 SQL 注入结论方向一致。POC 齐全度为 1/1，但该 POC 为静态源码推导的文本工件，未做动态验证。攻击面测绘提出的路径穿越/文件包含、弱哈希、弱随机、硬编码凭据、Cookie 标志、信任边界等风险点均未被 findings 覆盖，已转入人工复核。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>055.php 留言板 INSERT 语句 SQL 注入（CWE-89）</td><td><code>055.php:19</code></td><td>0.78</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-0108b5d86494'><h2>F-1 055.php 留言板 INSERT 语句 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.78 · candidate / rule_verified+llm</p><p><b>位置：</b><code>055.php:17-19</code></p><p>攻击者通过 HTTP 请求向 055.php 提交留言表单，外部输入在 055.php:5 被读入变量 $message（候选标注为 query `mtxMessage`，即留言内容字段）。该值未经任何转义或参数化，在 055.php:18 被直接拼接进 SQL 字符串：$query = &quot;INSERT INTO guestbook ( comment, name ) VALUES ( &#x27;$message&#x27;, &#x27;$name&#x27; );&quot;;，随后在 055.php:19 交由 mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $query) 执行。由于 $message 位于单引号字符串字面量内部，攻击者只需闭合单引号即可注入任意 SQL 片段（例如在 comment 值中构造 &#x27; , (SELECT ...))-- - 之类的载荷），并可用注释符截断后续语句。代码中未见 mysqli_real_escape_string、预处理语句或类型白名单等任何净化措施，因此校验完全缺失。此外 055.php:19 的 or die(...) 分支会把 mysqli_error() 的原始错误信息回显到页面，为报错型注入提供了直接反馈通道。</p><p><b>影响：</b>数据库注入可导致 guestbook 库表数据被任意读取、篡改或删除（数据泄露与完整性破坏）；结合报错回显可逐步枚举库名、表名与字段内容。若数据库账号权限过高，还可通过堆叠/文件写入等手段进一步扩大影响，最严重情形可导致服务器上的任意文件写入乃至远程代码执行。该端点通常无需认证即可访问，外部攻击者可直接利用。</p><p><b>CVE/CWE 论证：</b>CWE-89（SQL 命令中特殊元素的不当中和）。外部可达性：注入点位于 055.php 的公开留言提交处理逻辑，攻击者通过 HTTP 参数即可控制 $message；无需认证；利用链闭合：055.php:5 读取外部输入 → 055.php:18 字符串拼接构造 $query → 055.php:19 mysqli_query 执行，且 055.php:19 的 die(mysqli_error(...)) 回显错误信息，形成完整的注入与反馈闭环。</p><p><b>修复建议：</b>1) 改用预处理语句与参数绑定：$stmt = $mysqli-&gt;prepare(&quot;INSERT INTO guestbook (comment, name) VALUES (?, ?)&quot;); $stmt-&gt;bind_param(&#x27;ss&#x27;, $message, $name); $stmt-&gt;execute();，从根本上消除拼接。2) 若必须使用 mysqli_query，至少对 $message、$name 调用 mysqli_real_escape_string 并配合正确的字符集设置。3) 对输入做长度与字符白名单校验。4) 关闭错误回显，将 mysqli_error 写入服务端日志而非输出到响应体。5) 数据库账号遵循最小权限，仅授予 INSERT 权限，禁用 FILE 权限。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>055.php:5</code></td><td>从 query `mtxMessage` 读取外部输入</td><td>污点进入 query</td><td></td></tr><tr><td>2</td><td><code>055.php:19</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;],  $query ) or die( &#x27;&lt;pre&gt;&#x27; . ((is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_error($GLOBALS[&quot;___mysqli_ston&quot;]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . &#x27;&lt;/pre&gt;&#x27; );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /055（POST）的 SQL 注入 POC。注入点：POST 参数 mtxMessage；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/055&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/055&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;mtxMessage=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/055&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;mtxMessage=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>POST /055 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 50
+
+mtxMessage=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

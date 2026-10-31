@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-173102-476bd9</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-173102-476bd9 · 生成时间: 2026-10-31T09:31:45.728034+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\036.zip · SHA256: 21f0b55e102a19f7e1305cfce872a6ab1e1c931079a8ad1e4b9dbafe94f87b7f</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：036.php 的开放重定向（open_redirect，medium，LLM-7af8cc31bcdd），位于 036.php 第 13 行附近的 header Location 输出，判定为 redirect 参数黑名单可绕过；该条带 POC（静态文本 POC，未执行、未动态验证）。最高危即此条 medium 开放重定向，无高危/严重项。POC 齐全度：1/1 finding 有 POC，但均为静态证据 POC，不能宣称可动态复现。整体覆盖极薄：仅 1 个 PHP 文件、0 个端点、无框架，且输入未提供 036.php 代码正文，注入类与配置类结论均无法落地。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-medium'>medium</span></td><td><code>open_redirect</code></td><td>036.php redirect 参数黑名单可绕过导致开放重定向（header location 注入）</td><td><code>036.php:13</code></td><td>0.82</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-7af8cc31bcdd'><h2>F-1 036.php redirect 参数黑名单可绕过导致开放重定向（header location 注入）</h2><p><span class='sev sev-medium'>medium</span> <code>open_redirect</code> / CWE-601 · 置信度 0.82 · candidate / llm_inferred</p><p><b>位置：</b><code>036.php:3-13</code></p><p>脚本从 $_GET[&#x27;redirect&#x27;] 读取跳转目标，仅用 preg_match(&quot;/http:\/\/|https:\/\//i&quot;) 做黑名单校验，禁止出现 http:// 或 https:// 子串；校验通过后直接 header(&quot;location: &quot; . $_GET[&#x27;redirect&#x27;]) 输出跳转。该黑名单只匹配字面协议前缀，未做 URL 规范化、未限制为相对路径、未校验 scheme，因此可用协议相对 URL（//evil.example）、大小写/编码变体、反斜杠变体（\\evil.example）、或其它 scheme（如 javascript:、data:、ftp:）绕过，实现任意目标跳转。攻击者可构造可信域链接诱导受害者跳转到钓鱼站点，或利用 javascript: 伪协议在部分客户端触发脚本执行。</p><p><b>影响：</b>开放重定向：攻击者可借助可信域链接将用户导向钓鱼/恶意站点；若客户端接受 javascript: 伪协议，可进一步执行脚本。</p><p><b>CVE/CWE 论证：</b>CWE-601 URL 重定向到不可信站点。外部无需认证即可通过 GET 参数触发，source→sink 链在 036.php:3-11 完整闭合，黑名单可被协议相对 URL 绕过。</p><p><b>修复建议：</b>不要直接使用用户输入作为 Location。改为服务端维护允许的跳转目标白名单（映射 ID→URL），或强制只接受站内相对路径并做规范化校验（拒绝以 //、\\、: 开头及任何 scheme）。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>036.php:3</code></td><td>检查 GET 参数 redirect 存在且非空，攻击者完全控制其值</td><td>原始字符串，未过滤</td><td></td></tr><tr><td>2</td><td><code>036.php:4</code></td><td>preg_match 黑名单仅匹配 http:// 或 https:// 子串，不匹配 //、\\、javascript: 等变体</td><td>通过校验（不含 http:// / https:// 字面量）</td><td>黑名单只覆盖两种字面协议前缀，协议相对 URL //host、反斜杠 \\host、javascript:/data: 等均不含该子串，直接绕过</td></tr><tr><td>3</td><td><code>036.php:11</code></td><td>未做任何规范化或白名单，直接将攻击者字符串拼入 Location 响应头</td><td>原样进入 HTTP 响应头</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 036.php（GET 路由 /036.php）的开放重定向 POC。源码第 13 行将外部可控的 GET 参数 redirect 直接用于跳转（Location 头），未做白名单或同源校验，攻击者可诱导受害者跳转至攻击者控制的域名。目标地址统一使用 TARGET 占位符，仅限授权测试。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/036.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 开放重定向 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/036.php?redirect=%2F%2Fexample.com&#x27;</pre><div class='muted'>预期：响应为 30x 且 Location 指向攻击者控制的域名。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/036.php?redirect=%2F%2Fexample.com&#x27;
+</pre><h4>request.http</h4><pre>GET /036.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 26
+
+redirect=%2F%2Fexample.com
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

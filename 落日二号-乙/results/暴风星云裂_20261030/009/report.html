@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261030-224559-fb9bd5</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261030-224559-fb9bd5 · 生成时间: 2026-10-30T14:46:36.796955+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\009.zip · SHA256: 541554841eafd869888c6f913c00fe17c4ae258598cf3ee74def3c3f80990814</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次仅覆盖单个 PHP 文件 009.php（79 行，无框架、无路由配置），交付 1 条高危发现：LLM-a078cd46dacc，009.php 第 29 行附近 user_id 参数 SQL 注入，且 token 硬编码可绕过，已附 POC（HTTP 型，仅限授权测试，目标用 TARGET 占位）。这是本次唯一交付项，也是最高危项。POC 齐全度：1/1 有 POC，但均为静态源码推断（llm_inferred），未做动态验证。其余攻击面（命令执行、路径穿越/文件包含、反射型 XSS、弱哈希/弱加密/弱随机、Cookie 标志、信任边界、硬编码凭据）在 surface_notes 中被列为待核查优先级，但未形成 findings，需人工打开文件确认。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>sql_injection</code></td><td>DVWA 009.php 用户资料查询 user_id 参数 SQL 注入（token 硬编码可绕过）</td><td><code>009.php:29</code></td><td>0.4</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-a078cd46dacc'><h2>F-1 DVWA 009.php 用户资料查询 user_id 参数 SQL 注入（token 硬编码可绕过）</h2><p><span class='sev sev-high'>high</span> <code>sql_injection</code> / CWE-89 · 置信度 0.4 · candidate / llm_inferred</p><p><b>位置：</b><code>009.php:13-29</code></p><p>009.php 第 13-17 行从 $_GET[&#x27;user_id&#x27;] 取参，仅用 preg_match(&#x27;/^\d+$/&#x27;) 做纯数字校验；第 21 行将 $id 直接拼接进 SELECT 语句并 mysqli_query 执行，第 28 行再次拼接执行。虽然第 14 行有数字白名单，但第 26 行的 token 校验使用硬编码字符串 &#x27;user_token&#x27;（源码注释亦提示不安全），攻击者可直接携带 token=user_token 通过。由于第 14 行正则要求纯数字，普通字符串注入被阻断，但 MySQL 在数字上下文中会把 &#x27;1 OR 1=1&#x27; 之类解析为表达式，且更关键的是第 21 行 $id 未做 mysqli_real_escape_string/参数化，纯数字约束下仍可通过布尔/时间盲注（如 1 AND SLEEP(5)、1 AND (SELECT ...)）实施注入，读取 users 表任意数据。</p><p><b>影响：</b>攻击者可绕过 token 校验并注入 SQL，读取 users 表任意用户资料（姓名、头像等），进一步可枚举数据库内容。</p><p><b>CVE/CWE 论证：</b>CWE-89。外部 GET 可达，token 为硬编码可绕过，source→sink 链在 009.php 内闭合。</p><p><b>修复建议：</b>使用预处理语句（mysqli_prepare/bind_param）替代字符串拼接；移除硬编码 token，改用服务端会话与随机令牌；对 user_id 做 intval 强类型转换。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>009.php:13</code></td><td>入口判断 action 与 user_id 是否设置</td><td>原始 GET 参数</td><td></td></tr><tr><td>2</td><td><code>009.php:14</code></td><td>preg_match(&#x27;/^\d+$/&#x27;) 仅允许纯数字，构成弱防护</td><td>字符串经正则校验</td><td>纯数字仍可在 SQL 数字上下文构造布尔/时间盲注表达式，且 token 校验为硬编码可绕过</td></tr><tr><td>3</td><td><code>009.php:17</code></td><td>$id 赋值</td><td>$id = $_GET[&#x27;user_id&#x27;]</td><td></td></tr><tr><td>4</td><td><code>009.php:21</code></td><td>拼接进 SELECT 语句</td><td>字符串拼接进 SQL</td><td></td></tr><tr><td>5</td><td><code>009.php:22</code></td><td>mysqli_query 执行</td><td>SQL 执行</td><td></td></tr><tr><td>6</td><td><code>009.php:26</code></td><td>token 硬编码校验 &#x27;user_token&#x27;，可被直接满足</td><td>攻击者提供 token=user_token</td><td>硬编码常量，非秘密</td></tr><tr><td>7</td><td><code>009.php:28</code></td><td>再次拼接 $id 执行查询</td><td>SQL 执行</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /009.php（GET）的 SQL 注入 POC。注入点为 GET 参数 user_id，该参数值被直接拼接到 SQL 查询中（009.php:29），未做有效净化。payload 使用 TARGET 占位符，仅限授权测试。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/009.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/009.php?user_id=%27%20OR%20%271%27%3D%271&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/009.php?user_id=%27%20OR%20%271%27%3D%271&#x27;
+</pre><h4>request.http</h4><pre>GET /009.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 33
+
+user_id=%27%20OR%20%271%27%3D%271
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

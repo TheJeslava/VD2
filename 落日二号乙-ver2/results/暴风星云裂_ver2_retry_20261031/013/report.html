@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-001858-400795</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-001858-400795 · 生成时间: 2026-10-30T16:19:40.218273+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\013.zip · SHA256: c79a98517aa6ef490facce4e07350a32f2516ff99bcb58570c7b55f84a352bbe</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>2</b>findings</div>
+<div class="metric"><b>2</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总 2 条已去重 findings，均集中在单文件 PHP 脚本 013.php（55 行）：一条为 critical 级 SQL 注入（GEN-89dab2f7ae60，修改密码处，CWE-89，规则命中），一条为 high 级 auth_bypass（LLM-fbe117aea12d，CAPTCHA 校验可被伪造请求头绕过，含硬编码后门值）。最高危为 013.php 的 SQL 注入，位于密码修改逻辑，可导致凭据数据被读取或篡改。两条 finding 均标注 has_poc=true，POC 文本齐全，但均为静态源码推断产物，未做任何动态验证；auth_bypass 依赖硬编码后门值与会话语义，属静态证据 POC，不能宣称可动态复现。本次无二次注入链输入，未做二次注入判定。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>013.php 修改密码处 SQL 注入（CWE-89）</td><td><code>013.php:31</code></td><td>0.53</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-high'>high</span></td><td><code>auth_bypass</code></td><td>DVWA 密码修改接口 CAPTCHA 校验可被伪造请求头绕过（硬编码后门值）</td><td><code>013.php:31</code></td><td>0.9</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-89dab2f7ae60'><h2>F-1 013.php 修改密码处 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.53 · candidate / rule_verified+llm</p><p><b>位置：</b><code>013.php:29-31</code></p><p>攻击者通过 HTTP 请求提交参数 password_conf（013.php:9 读取），该值被赋给 $pass_new 后直接字符串拼接进 UPDATE 语句：013.php:30 构造 $insert = &quot;UPDATE `users` SET password = &#x27;$pass_new&#x27; WHERE user = &#x27;&quot; . dvwaCurrentUser() . &quot;&#x27; LIMIT 1;&quot;，其中 $pass_new 未做任何转义或参数化；随后 013.php:31 通过 mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $insert) 执行。由于单引号可被注入，攻击者可闭合 password 字段的字符串字面量，改写 SET 子句或追加条件，从而改变 UPDATE 语义。代码中未见 mysqli_real_escape_string、预处理语句或白名单校验，校验完全缺失。</p><p><b>影响：</b>可对 users 表执行任意 UPDATE 语义：篡改任意用户（含 admin）口令实现账户接管/越权登录，或通过布尔/时间盲注逐位读取数据库内容（凭据、用户表数据）造成数据泄露；错误信息经 die(mysqli_error(...)) 回显，进一步辅助报错注入。</p><p><b>CVE/CWE 论证：</b>CWE-89（SQL 命令中特殊元素未正确中和）。外部可达：013.php 为 Web 端点，参数 password_conf 由请求直接提供，无需认证即可到达 013.php:9→30→31 的完整链路；污点从 source 到 mysqli_query 汇点闭合，中间无净化函数，故成立。</p><p><b>修复建议：</b>改用预处理语句：$stmt = $mysqli-&gt;prepare(&quot;UPDATE `users` SET password = ? WHERE user = ? LIMIT 1&quot;); $stmt-&gt;bind_param(&#x27;ss&#x27;, $pass_new, dvwaCurrentUser()); 并对 dvwaCurrentUser() 同样参数化；若必须拼接，使用 mysqli_real_escape_string 并配合最小权限数据库账户；关闭 die(mysqli_error()) 的详细错误回显，改为记录日志。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>013.php:9</code></td><td>从 query `password_conf` 读取外部输入</td><td>污点进入 insert</td><td></td></tr><tr><td>2</td><td><code>013.php:31</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;],  $insert ) or die( &#x27;&lt;pre&gt;&#x27; . ((is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_error($GLOBALS[&quot;___mysqli_ston&quot;]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . &#x27;&lt;/pre&gt;&#x27; );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /013（ANY）的 SQL 注入 POC。注入点：ANY 参数 password_conf；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/013&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/013?password_conf=%27%20OR%20%271%27%3D%271&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/013?password_conf=%27%20OR%20%271%27%3D%271&#x27;
+</pre><h4>request.http</h4><pre>ANY /013 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 39
+
+password_conf=%27%20OR%20%271%27%3D%271
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-fbe117aea12d'><h2>F-2 DVWA 密码修改接口 CAPTCHA 校验可被伪造请求头绕过（硬编码后门值）</h2><p><span class='sev sev-high'>high</span> <code>auth_bypass</code> / CWE-287 · 置信度 0.9 · candidate / llm_inferred</p><p><b>位置：</b><code>013.php:17-31</code></p><p>013.php 在处理密码修改时，CAPTCHA 校验逻辑为 `if ($resp || ($_POST[&#x27;g-recaptcha-response&#x27;] == &#x27;hidd3n_valu3&#x27; &amp;&amp; $_SERVER[&#x27;HTTP_USER_AGENT&#x27;] == &#x27;reCAPTCHA&#x27;))`。攻击者无需真正通过 reCAPTCHA，只需提交固定字符串 `hidd3n_valu3` 作为 g-recaptcha-response，并把 User-Agent 设为 `reCAPTCHA`，即可让整个条件恒真，进入密码修改分支。该分支随后用 md5 处理新密码并执行 UPDATE 语句修改当前用户密码，导致攻击者在不知道原密码、不通过人机校验的情况下重置账户密码，构成认证绕过/账户接管。</p><p><b>影响：</b>攻击者无需通过 CAPTCHA、无需知道原密码即可重置账户密码，导致账户接管；若结合 CSRF 可对受害者静默改密。</p><p><b>CVE/CWE 论证：</b>CWE-287 认证机制不当 / CWE-798 硬编码凭据。外部可通过 HTTP 请求直接触发，条件恒真分支完全由攻击者可控输入决定，利用链闭合。</p><p><b>修复建议：</b>移除硬编码后门值 hidd3n_valu3 及基于 User-Agent 的绕过分支，仅信任 recaptcha_check_answer 的真实返回结果；同时校验原密码。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>013.php:3</code></td><td>脚本检测到 POST 参数 Change 后进入密码修改流程</td><td>攻击者控制整个 POST 请求体</td><td></td></tr><tr><td>2</td><td><code>013.php:8-9</code></td><td>读取 password_new / password_conf 两个新密码参数</td><td>原始字符串，未净化</td><td></td></tr><tr><td>3</td><td><code>013.php:12-15</code></td><td>调用 recaptcha_check_answer 校验第三方 CAPTCHA，正常情况下应返回失败</td><td>$resp 为 false（未通过真实 CAPTCHA）</td><td></td></tr><tr><td>4</td><td><code>013.php:17-23</code></td><td>由于 $resp 为 false，进入 OR 的第二个条件；攻击者提交 g-recaptcha-response=hidd3n_valu3 且 User-Agent=reCAPTCHA，使条件恒真</td><td>布尔条件被攻击者控制为 true</td><td>硬编码后门值 hidd3n_valu3 与可伪造的 User-Agent 头共同构成绕过条件，完全跳过真实 CAPTCHA 校验</td></tr><tr><td>5</td><td><code>013.php:25-27</code></td><td>两次密码一致时，对新密码做 mysqli_real_escape_string 后 md5</td><td>新密码被 md5 哈希</td><td></td></tr><tr><td>6</td><td><code>013.php:30-31</code></td><td>拼接 UPDATE 语句并执行，修改当前用户密码</td><td>SQL 语句执行，密码被重置</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /vulnerabilities/captcha/（POST）的认证绕过 POC（CWE-287）。服务端对 g-recaptcha-response 的校验可被伪造值绕过，从而以未授权身份通过验证流程。目标地址统一使用 TARGET 占位符，仅限授权测试。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/vulnerabilities/captcha/&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 认证绕过 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/vulnerabilities/captcha/&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;g-recaptcha-response=admin&#x27;</pre><div class='muted'>预期：以未授权/伪造身份访问受保护资源返回 2xx。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/vulnerabilities/captcha/&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;g-recaptcha-response=admin&#x27;
+</pre><h4>request.http</h4><pre>POST /vulnerabilities/captcha/ HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 26
+
+g-recaptcha-response=admin
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

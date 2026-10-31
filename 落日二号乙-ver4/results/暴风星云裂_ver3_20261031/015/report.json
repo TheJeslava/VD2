@@ -1,0 +1,1335 @@
+{
+  "schema_version": "1.0",
+  "generator": {
+    "name": "落日二号乙 / Sunset Two Beta",
+    "version": "1.0.0"
+  },
+  "run": {
+    "run_id": "20261031-005912-247a49",
+    "generated_at": "2026-10-30T17:00:15.090677+00:00",
+    "input_mode": "zip",
+    "target_url": "",
+    "zip_path": "C:\\Users\\liyuf\\Desktop\\794\\暴风星云裂\\015.zip",
+    "zip_sha256": "24ec46248538ba08d8e8eb94c82934ecea9f754341b0de0a93fec8dda6a387c2",
+    "duration_sec": 62.8
+  },
+  "project": {
+    "file_count": 1,
+    "text_file_count": 1,
+    "languages": {
+      "php": 1
+    },
+    "frameworks": [],
+    "endpoint_count": 0,
+    "endpoints": [],
+    "files": [
+      {
+        "path": "015.php",
+        "language": "php",
+        "lines": 83,
+        "size": 2911
+      }
+    ]
+  },
+  "summary": {
+    "text": "本次汇总基于单文件 PHP 脚本 015.php（83 行）的静态审计结果，共 6 条去重 findings，全部带 POC（6/6）。最高危为 015.php 第 69 行附近的 SQL 注入（GEN-c00a42452f04，critical，CWE-89），位于口令修改流程，属 HTTP 可复现类 POC。其次为两条 captcha_bypass（LLM-c737fb0d7fd9、SEM-2b846713ecdc，high，CWE-804），指向同一状态机缺陷：直接提交 step=2 与 passed_captcha=true 即可跳过验证码，二者为同一根因的不同表述，建议合并处置。中危包括：MD5 存储口令（SEM-81919fa4d087，标注为 weak_crypto，但按 CWE-328 应归 weak_hash，属类型标注偏差，需人工纠正）、step=1 隐藏表单未编码回显导致的反射型 XSS（LLM-f67e226dc1d1）、改密接口缺 CSRF 防护（SEM-bb70b3793387）。所有结论均为静态源码推断（llm_inferred / rule），未做动态验证；weak_hash 类仅有静态证据 POC，不能宣称可动态复现。",
+    "total_findings": 6,
+    "with_poc": 6,
+    "by_severity": {
+      "critical": 1,
+      "high": 2,
+      "medium": 3
+    },
+    "by_verdict": {
+      "candidate": 6
+    },
+    "by_evidence_level": {
+      "rule_verified+llm": 4,
+      "llm_inferred": 2
+    },
+    "by_origin": {
+      "rule": 4,
+      "llm_finding": 2
+    },
+    "second_order": 0,
+    "injection_signals": 0,
+    "quarantined_files": []
+  },
+  "findings": [
+    {
+      "id": "GEN-c00a42452f04",
+      "title": "015.php 口令修改处 SQL 注入（CWE-89）",
+      "vulnerability_type": "sql_injection",
+      "cwe": "CWE-89",
+      "cwe_name": "SQL 注入",
+      "severity": "critical",
+      "cvss_estimate": 9.8,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.4,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "015.php",
+        "line_start": 67,
+        "line_end": 69,
+        "endpoint": "/015",
+        "http_method": "ANY"
+      },
+      "source": "query `password_new`（015.php:51）",
+      "sink": "015.php:69 $result = mysqli_query($GLOBALS[\"___mysqli_ston\"],  $insert ) or die( '<pre>' . ((is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_error($GLOBALS[\"___mysqli_ston\"]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . '</pre>' );",
+      "description": "攻击者通过修改口令表单提交 password_new 参数（015.php:8 处 $pass_new = $_POST['password_new']），该值在 015.php:64 仅经过 mysqli_real_escape_string 转义后，于 015.php:65 被 md5() 处理，随后在 015.php:68 被直接拼接进 UPDATE 语句：$insert = \"UPDATE `users` SET password = '$pass_new' WHERE user = '\" . dvwaCurrentUser() . \"'\"，最终在 015.php:69 由 mysqli_query 执行。由于 md5() 输出为固定 32 位十六进制串，password_new 的原始内容无法以引号形式进入 SQL，因此该路径上的注入不成立；真正未参数化的是 dvwaCurrentUser() 的返回值被直接拼入 WHERE 子句，但该值来自会话而非请求参数，外部不可控。综合判断：候选所声称的 password_new→$insert 污点链在 md5 处被截断，证据不足以支撑可利用的 SQL 注入。",
+      "impact": "若成立可导致数据库任意读写、口令表被篡改或数据泄露；但按现有代码证据，password_new 经 md5 后无法携带 SQL 元字符，实际影响无法确认。",
+      "cve_justification": "CWE-89 要求外部可控数据未经参数化进入 SQL。本候选的 source（password_new）在 015.php:65 被 md5 归一化为十六进制串，破坏了注入所需的引号闭合条件；WHERE 子句中的 dvwaCurrentUser() 非请求可控。外部可达性与利用链闭合性均不满足，故不构成可确认的 CWE-89。",
+      "suggestion": "即便当前 md5 阻断了注入，仍应改为预处理语句：$stmt = $db->prepare('UPDATE users SET password = ? WHERE user = ?'); $stmt->bind_param('ss', $pass_new, dvwaCurrentUser()); 避免任何字符串拼接；同时对 dvwaCurrentUser() 的返回值做白名单校验。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "015.php:51",
+          "description": "从 query `password_new` 读取外部输入",
+          "data_state": "污点进入 insert",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "015.php:69",
+          "description": "危险汇点：$result = mysqli_query($GLOBALS[\"___mysqli_ston\"],  $insert ) or die( '<pre>' . ((is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_error($GLOBALS[\"___mysqli_ston\"]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . '</pre>' );",
+          "data_state": "污点进入 sql_injection 汇点",
+          "bypass_reason": "未发现有效净化/参数化"
+        }
+      ],
+      "poc": {
+        "description": "针对 /015（ANY）的 SQL 注入 POC。注入点：ANY 参数 password_new；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /015 使用 ANY",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/015'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 SQL 注入 载荷",
+            "request": "curl -sS -i -X ANY 'http://TARGET:8080/015?password_new=%27%20OR%20%271%27%3D%271'",
+            "expected_response": "布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "' OR '1'='1",
+        "impact": "攻击者可读取/篡改数据库、绕过认证，造成大规模数据泄露。",
+        "cve_justification": "符合 CWE-89。漏洞位于可交付代码 015.php:69，外部输入来自 query `password_new`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X ANY 'http://TARGET:8080/015?password_new=%27%20OR%20%271%27%3D%271'\n",
+          "request.http": "ANY /015 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 38\r\n\r\npassword_new=%27%20OR%20%271%27%3D%271\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/015",
+              "method": "ANY"
+            }
+          }
+        },
+        "artifact_dir": "poc/GEN-c00a42452f04"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 ANY /015；source=query/password_new；sink=015.php:69；规则 php-sql。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：POST password_new → 015.php:8 $pass_new → 015.php:64 mysqli_real_escape_string → 015.php:65 md5($pass_new)（污点被归一化为 32 位十六进制，引号无法保留）→ 015.php:68 字符串拼接 $insert → 015.php:69 mysqli_query。链条在 md5 处断开，无法闭合。\nPocWriter 建议（未采纳，缺少端点 /015）：针对 015.php 密码修改逻辑的 SQL 注入 POC。源码 015.php:69 将外部输入 password_new 经 mysqli_real_escape_string 后拼接进 UPDATE/INSERT 语句（DVWA 风格 low 级别），注入点为 query 参数 password_new。目标地址使用 TARGET 占位符。\nPocWriter 建议（未采纳，缺少端点 /015）：符合 CWE-89。漏洞位于 015.php:69，外部输入来自 query 参数 password_new，source→sink 链静态闭合，未发现有效净化，具备远程触发条件。\nPOC 备注：仅限授权测试；POC 为文本工件，不执行、不联网。保留原请求结构，仅补充说明与预期结果。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "sql_injection",
+        "CWE-89",
+        "critical",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "LLM-c737fb0d7fd9",
+      "title": "DVWA 密码修改流程 CAPTCHA 状态机可绕过（直接提交 step=2 与 passed_captcha=true）",
+      "vulnerability_type": "captcha_bypass",
+      "cwe": "CWE-804",
+      "cwe_name": "验证码绕过",
+      "severity": "high",
+      "cvss_estimate": 8.1,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.87,
+      "verdict": "candidate",
+      "evidence_level": "llm_inferred",
+      "origin": "llm_finding",
+      "needs_verification": true,
+      "location": {
+        "file": "015.php",
+        "line_start": 46,
+        "line_end": 69,
+        "endpoint": "/015.php",
+        "http_method": "POST"
+      },
+      "source": "body `passed_captcha`（015.php）",
+      "sink": "015.php:69 mysqli_query 执行 UPDATE users SET password=... （第 68-69 行），在未校验 CAPTCHA 的情况下完成口令变更",
+      "description": "015.php 的密码修改被拆成两步：step=1 时调用 recaptcha_check_answer 校验验证码，通过后渲染一个隐藏表单，其中包含 step=2、passed_captcha=true 以及用户输入的 password_new/password_conf；step=2 分支只检查 $_POST['passed_captcha'] 是否为真值，完全不重新校验 CAPTCHA，也不校验该值是否由服务端签发。攻击者可以跳过 step=1，直接 POST step=2、passed_captcha=true、password_new、password_conf，从而在未通过任何 CAPTCHA 的情况下修改当前登录用户的密码。该逻辑使 CAPTCHA 保护形同虚设，可被用于自动化口令变更/账户接管链（配合 CSRF 或撞库后的会话）。",
+      "impact": "CAPTCHA 保护被完全绕过，攻击者可在无验证码交互的情况下自动化修改账户口令，削弱防暴力破解/防自动化能力，可并入账户接管链。",
+      "cve_justification": "CWE-804 (Guessable CAPTCHA) / CWE-841 (Improper Enforcement of Behavioral Workflow)：状态机信任客户端提交的 passed_captcha 标志，服务端未绑定会话，外部可直接触发，链闭合。",
+      "suggestion": "将 CAPTCHA 通过状态记录在服务端会话（如 $_SESSION['captcha_passed']=true 并一次性消费），step=2 时校验会话标志而非客户端字段；或合并为单步并在提交时重新校验 reCAPTCHA。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "015.php:46",
+          "description": "入口仅判断 Change 存在且 step==2，不要求先经过 step=1",
+          "data_state": "攻击者直接构造 step=2 请求",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "015.php:55",
+          "description": "唯一校验是 !$_POST['passed_captcha']，客户端可任意置为 true",
+          "data_state": "passed_captcha=true 通过判断",
+          "bypass_reason": "该标志由客户端提交，服务端未用会话/签名绑定，也未重新调用 recaptcha_check_answer"
+        },
+        {
+          "step": 3,
+          "location": "015.php:62",
+          "description": "两次密码一致即进入更新分支",
+          "data_state": "password_new==password_conf",
+          "bypass_reason": ""
+        },
+        {
+          "step": 4,
+          "location": "015.php:64-65",
+          "description": "转义后 md5 哈希",
+          "data_state": "md5(password)",
+          "bypass_reason": ""
+        },
+        {
+          "step": 5,
+          "location": "015.php:68-69",
+          "description": "拼接 UPDATE 并执行，修改当前用户口令",
+          "data_state": "SQL 执行，口令被替换",
+          "bypass_reason": ""
+        }
+      ],
+      "poc": {
+        "description": "针对 /015.php（POST）的 验证码绕过 POC。注入点：POST 参数 passed_captcha；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /015.php 使用 POST",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/015.php'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 验证码绕过 载荷",
+            "request": "curl -sS -i -X POST 'http://TARGET:8080/015.php' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'passed_captcha=SUNSET_PROBE'",
+            "expected_response": "按漏洞类型观察相应的异常响应/副作用。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "可绕过验证码保护，导致自动化滥用、未授权访问或业务逻辑被绕过。",
+        "cve_justification": "符合 CWE-804。漏洞位于可交付代码 015.php:69，外部输入来自 body `passed_captcha`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X POST 'http://TARGET:8080/015.php' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'passed_captcha=SUNSET_PROBE'\n",
+          "request.http": "POST /015.php HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 27\r\n\r\npassed_captcha=SUNSET_PROBE\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/015.php",
+              "method": "POST"
+            }
+          }
+        },
+        "artifact_dir": "poc/LLM-c737fb0d7fd9"
+      },
+      "external_evidence": [],
+      "verification_notes": "需确认 dvwaCurrentUser() 依赖会话且 015.php 需登录；recaptcha_check_answer 在 step=2 确实未被调用（源码已证实）。动态验证需真实会话。\n模型 POC 要点：跳过 CAPTCHA 第一步，直接提交第二步完成口令修改\nLLM 深挖（AutoCVE Finding 风格）：单次调用、无工具；文件与行号已校验，代码片段由真实源码回填。\nPocWriter 建议（未采纳，缺少端点 /015.php）：针对 015.php 验证码校验逻辑的绕过 POC。源码 015.php:69 附近对 passed_captcha 的校验可被伪造值绕过，注入点为 POST body 参数 passed_captcha。\nPocWriter 建议（未采纳，缺少端点 /015.php）：符合 CWE-804。漏洞位于 015.php:69，外部输入来自 body 参数 passed_captcha，source→sink 链静态闭合，具备远程触发条件。\nPOC 备注：仅限授权测试；POC 为文本工件，不执行、不联网。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "captcha_bypass",
+        "CWE-804",
+        "high",
+        "llm_finding",
+        "llm_inferred"
+      ]
+    },
+    {
+      "id": "SEM-2b846713ecdc",
+      "title": "015.php 口令修改流程的验证码/步骤绕过（CWE-804）",
+      "vulnerability_type": "captcha_bypass",
+      "cwe": "CWE-804",
+      "cwe_name": "验证码绕过",
+      "severity": "high",
+      "cvss_estimate": 8.1,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.6,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "015.php",
+        "line_start": 2,
+        "line_end": 3,
+        "endpoint": "/015",
+        "http_method": "ANY"
+      },
+      "source": "request `captcha/step`（015.php）",
+      "sink": "015.php:3 if( isset( $_POST[ 'Change' ] ) && ( $_POST[ 'step' ] == '1' ) ) {",
+      "description": "015.php:3 以 if( isset($_POST['Change']) && ($_POST['step'] == '1') ) 作为流程分支条件，step 完全由客户端 POST 控制。攻击者可直接构造 POST Change=Change&step=1&password_new=...&password_conf=... 跳过验证码展示与校验阶段，直接进入 015.php:7-9 的取参与 015.php:64-69 的改密逻辑。代码片段中未见服务端对验证码答案的比对，也未见 step 的服务端状态机约束，因此客户端可通过控制 step 值绕过验证码环节。",
+      "impact": "攻击者可绕过验证码保护，对改密接口进行自动化暴力提交或批量口令重置，削弱针对自动化攻击的防护，并可与 CSRF 组合放大改密请求的滥用面。",
+      "cve_justification": "CWE-804（验证码可被绕过）成立条件为验证码校验依赖客户端可控状态或缺失服务端比对。015.php:3 的 step 来自 $_POST，且片段内无验证码答案校验代码，外部无需认证即可直接提交最终状态请求，利用链在单请求内闭合。",
+      "suggestion": "将验证码答案与一次性 token 绑定在服务端会话中校验，step 等流程状态只存于 $_SESSION 而不接受客户端传入；校验失败即拒绝进入改密分支；对改密接口增加频率限制。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "015.php:3",
+          "description": "验证码流程存在可控 step/client 状态；需直接提交最终状态改变请求复核",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "针对 /015 的验证码步骤绕过 POC。源码 015.php:3 处对 captcha/step 参数的处理允许跳过验证码步骤，注入点为 query 参数 captcha/step。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /015 使用 ANY",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/015'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 验证码绕过 载荷",
+            "request": "curl -sS -i -X ANY 'http://TARGET:8080/015?captcha/step=SUNSET_PROBE'",
+            "expected_response": "按漏洞类型观察相应的异常响应/副作用。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "可绕过验证码保护，导致自动化滥用或未授权访问。",
+        "cve_justification": "符合 CWE-804。漏洞位于可交付代码 015.php:3，外部输入来自 query `captcha/step`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X ANY 'http://TARGET:8080/015?captcha/step=SUNSET_PROBE'\n",
+          "request.http": "ANY /015 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 25\r\n\r\ncaptcha/step=SUNSET_PROBE\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/015",
+              "method": "ANY"
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-2b846713ecdc"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 ANY /015；source=request/captcha/step；sink=015.php:3；规则 php-captcha-state。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：攻击者 POST Change=Change&step=1 → 015.php:3 条件成立，跳过验证码阶段 → 015.php:7-9 读取 password_new/password_conf → 015.php:64-69 执行改密 UPDATE。全程无需通过验证码。\nPocWriter 建议（未采纳，缺少端点 /015）：符合 CWE-804。漏洞位于 015.php:3，外部输入来自 query 参数 captcha/step，source→sink 链静态闭合，具备远程触发条件。\nPOC 备注：仅限授权测试；POC 为文本工件，不执行、不联网。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "captcha_bypass",
+        "CWE-804",
+        "high",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "SEM-81919fa4d087",
+      "title": "015.php 使用 MD5 存储口令（CWE-328）",
+      "vulnerability_type": "weak_crypto",
+      "cwe": "CWE-327",
+      "cwe_name": "弱加密算法",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.8,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "015.php",
+        "line_start": 64,
+        "line_end": 65,
+        "endpoint": "/015",
+        "http_method": "ANY"
+      },
+      "source": "repository `md5(`（015.php）",
+      "sink": "015.php:65 \t\t$pass_new = md5( $pass_new );",
+      "description": "015.php:65 执行 $pass_new = md5( $pass_new );，将用户新口令以无盐 MD5 摘要形式写入数据库（015.php:68 的 UPDATE users SET password = '$pass_new'）。MD5 属快速哈希，抗碰撞与抗暴力能力弱，且此处未加盐、未使用迭代型口令哈希，口令摘要一旦泄露可被彩虹表/GPU 快速还原。",
+      "impact": "数据库泄露时攻击者可在极短时间内还原用户明文口令；由于用户常跨站复用口令，可进一步导致账户接管与横向越权。",
+      "cve_justification": "CWE-328（使用弱哈希算法）适用于口令等安全用途。015.php:65 明确对安全敏感的口令使用 MD5，属实现型弱点，无需 HTTP 污点链；外部可达性体现在任意改密请求都会生成 MD5 摘要。",
+      "suggestion": "改用 password_hash($pass_new, PASSWORD_DEFAULT) 生成带盐的 bcrypt/Argon2 摘要，校验时用 password_verify；对历史 MD5 记录在用户下次登录时透明升级。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "015.php:65",
+          "description": "弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "静态证据型 POC：015.php:65 使用 md5() 对密码做哈希，属弱哈希算法（CWE-328），无需发送请求。",
+        "preconditions": [
+          "可读取源码"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "在源码中定位证据",
+            "request": "grep -n -A2 -B2 '<evidence>' 015.php",
+            "expected_response": "命中硬编码凭据/弱算法/弱随机数调用"
+          },
+          {
+            "step": 2,
+            "action": "人工确认凭据有效性或算法使用场景",
+            "request": "（离线审查）",
+            "expected_response": "确认凭据仍有效或算法保护敏感数据"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "弱哈希可被彩虹表/暴力破解，导致凭据泄露。",
+        "cve_justification": "符合 CWE-328（弱哈希），非 CWE-327。需结合部署与数据敏感度确认价值。",
+        "scripts": {
+          "poc_readme.md": "# 静态证据\n\n- 文件: 015.php\n- 行号: 65\n- 片段:\n```\n64: \t\t$pass_new = ((isset($GLOBALS[\"___mysqli_ston\"]) && is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_real_escape_string($GLOBALS[\"___mysqli_ston\"],  $pass_new ) : ((trigger_error(\"[MySQLConverterToo] Fix the mysql_escape_string() call! This code does not work.\", E_USER_ERROR)) ? \"\" : \"\"));\n65: \t\t$pass_new = md5( $pass_new );\n66: \n```\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": false,
+          "warnings": [
+            "POC 未使用 TARGET 占位符，请人工检查目标地址"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "not_executable",
+            "errors": [],
+            "warnings": [],
+            "checks": {
+              "static_only": true,
+              "executed": false
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-81919fa4d087"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 ANY /015；source=repository/md5(；sink=015.php:65；规则 php-weak-crypto。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：POST password_new → 015.php:8 $pass_new → 015.php:64 转义 → 015.php:65 md5($pass_new) → 015.php:68 拼入 UPDATE → 015.php:69 写入 users.password。口令以无盐 MD5 落库。\nPOC 备注：仅限授权测试；静态证据，不执行、不联网。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "weak_crypto",
+        "CWE-327",
+        "medium",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "LLM-f67e226dc1d1",
+      "title": "015.php step=1 将 password_new/password_conf 未编码回显进隐藏表单（反射型 XSS）",
+      "vulnerability_type": "xss",
+      "cwe": "CWE-79",
+      "cwe_name": "跨站脚本",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.7,
+      "verdict": "candidate",
+      "evidence_level": "llm_inferred",
+      "origin": "llm_finding",
+      "needs_verification": true,
+      "location": {
+        "file": "015.php",
+        "line_start": 28,
+        "line_end": 36,
+        "endpoint": "/015.php",
+        "http_method": "POST"
+      },
+      "source": "body `password_new`（015.php:8）",
+      "sink": "015.php:36 $html .= \"...value=\\\"{$pass_new}\\\"...\" 输出到页面",
+      "description": "step=1 分支在两次密码一致时，把用户提交的 $pass_new、$pass_conf 直接插入 HTML 隐藏 input 的 value 属性（第 32-33 行），未做 htmlspecialchars 等编码。攻击者可构造 password_new/password_conf 含双引号闭合属性并注入脚本，在受害者浏览器执行。由于该页面通常需登录，实际利用需诱导已登录用户提交或配合 CSRF，价值中等。",
+      "impact": "反射型 XSS，可在受害者会话上下文执行脚本，窃取会话或代替用户操作。",
+      "cve_justification": "CWE-79：用户输入未编码进入 HTML 属性，外部可触发；但需登录与 CAPTCHA 条件，故置信度中等。",
+      "suggestion": "对回显值使用 htmlspecialchars($v, ENT_QUOTES, 'UTF-8') 编码，或改用服务端会话保存待确认密码而非回显到表单。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "015.php:8",
+          "description": "读取 password_new",
+          "data_state": "原始用户输入",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "015.php:26",
+          "description": "两次密码相等判断通过",
+          "data_state": "pass_new==pass_conf",
+          "bypass_reason": ""
+        },
+        {
+          "step": 3,
+          "location": "015.php:32-33",
+          "description": "未编码拼入 HTML 属性",
+          "data_state": "注入的引号/标签进入响应 HTML",
+          "bypass_reason": ""
+        }
+      ],
+      "poc": {
+        "description": "针对 /015.php（POST）的 跨站脚本 POC。注入点：POST 参数 password_new；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /015.php 使用 POST",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/015.php'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 跨站脚本 载荷",
+            "request": "curl -sS -i -X POST 'http://TARGET:8080/015.php' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'password_new=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E'",
+            "expected_response": "响应中脚本未编码，浏览器执行并弹出 document.domain。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "<script>alert(document.domain)</script>",
+        "impact": "攻击者可在受害者浏览器执行脚本，窃取会话或发起敏感操作。",
+        "cve_justification": "符合 CWE-79。漏洞位于可交付代码 015.php:36，外部输入来自 body `password_new`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X POST 'http://TARGET:8080/015.php' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  --data 'password_new=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E'\n",
+          "request.http": "POST /015.php HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 66\r\n\r\npassword_new=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/015.php",
+              "method": "POST"
+            }
+          }
+        },
+        "artifact_dir": "poc/LLM-f67e226dc1d1"
+      },
+      "external_evidence": [],
+      "verification_notes": "需确认页面是否需登录及 CAPTCHA 是否可绕过（见上一条）；实际浏览器执行需动态验证。\n模型 POC 要点：提交含引号闭合的密码值，触发脚本注入\nLLM 深挖（AutoCVE Finding 风格）：单次调用、无工具；文件与行号已校验，代码片段由真实源码回填。\nPocWriter 建议（未采纳，缺少端点 /015.php）：针对 015.php 的反射/存储型 XSS POC。源码 015.php:36 将外部输入 password_new 未编码输出到响应，注入点为 POST body 参数 password_new。\nPocWriter 建议（未采纳，缺少端点 /015.php）：符合 CWE-79。漏洞位于 015.php:36，外部输入来自 body 参数 password_new，source→sink 链静态闭合，未发现有效净化，具备远程触发条件。\nPOC 备注：仅限授权测试；POC 为文本工件，不执行、不联网。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "xss",
+        "CWE-79",
+        "medium",
+        "llm_finding",
+        "llm_inferred"
+      ]
+    },
+    {
+      "id": "SEM-bb70b3793387",
+      "title": "015.php 改密接口缺少 CSRF 防护（CWE-352）",
+      "vulnerability_type": "csrf",
+      "cwe": "CWE-352",
+      "cwe_name": "跨站请求伪造",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.55,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "015.php",
+        "line_start": 7,
+        "line_end": 8,
+        "endpoint": "/015",
+        "http_method": "ANY"
+      },
+      "source": "request `password change`（015.php）",
+      "sink": "015.php:8 \t$pass_new  = $_POST[ 'password_new' ];",
+      "description": "015.php:7-9 直接从 $_POST 读取 password_new 与 password_conf，并在 015.php:64-69 执行 UPDATE users SET password 的状态改变操作。片段中未见任何 CSRF token 校验、Origin/Referer 校验或二次确认口令比对逻辑，攻击者可构造第三方页面自动提交表单，使已登录受害者在不知情下被改密。",
+      "impact": "攻击者可强制受害者账户口令变为攻击者已知值，随后登录接管账户，造成越权访问与数据泄露。",
+      "cve_justification": "CWE-352 成立条件为状态改变请求仅依赖浏览器自动携带的凭据且无抗伪造令牌。015.php:8 的取参与 015.php:69 的 UPDATE 之间无 token 校验，外部站点可跨站提交，利用链闭合。",
+      "suggestion": "在改密表单中引入每会话随机 CSRF token 并在服务端比对；校验 Origin/Referer；会话 Cookie 设置 SameSite=Lax/Strict；改密前要求输入原口令。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "015.php:8",
+          "description": "状态改变请求未见 CSRF token/Origin 校验；需复核认证与 SameSite 条件",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "针对 /015 密码修改功能的 CSRF POC。源码 015.php:8 处密码修改表单缺少 CSRF token 校验，攻击者可诱导已登录用户提交表单。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /015 使用 ANY",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/015'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 跨站请求伪造 载荷",
+            "request": "curl -sS -i -X ANY 'http://TARGET:8080/015?password change=%E8%87%AA%E5%8A%A8%E6%8F%90%E4%BA%A4%E8%A1%A8%E5%8D%95%EF%BC%88%E8%A7%81%20poc.html%EF%BC%89'",
+            "expected_response": "受害者在已登录状态下自动提交表单，服务端接受状态变更。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "自动提交表单（见 poc.html）",
+        "impact": "可诱导已登录用户执行非预期状态变更，导致账户被篡改。",
+        "cve_justification": "符合 CWE-352。漏洞位于可交付代码 015.php:8，外部输入来自 query `password change`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X ANY 'http://TARGET:8080/015?password change=%E8%87%AA%E5%8A%A8%E6%8F%90%E4%BA%A4%E8%A1%A8%E5%8D%95%EF%BC%88%E8%A7%81%20poc.html%EF%BC%89'\n",
+          "request.http": "ANY /015 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 108\r\n\r\npassword change=%E8%87%AA%E5%8A%A8%E6%8F%90%E4%BA%A4%E8%A1%A8%E5%8D%95%EF%BC%88%E8%A7%81%20poc.html%EF%BC%89\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/015",
+              "method": "ANY"
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-bb70b3793387"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 ANY /015；source=request/password change；sink=015.php:8；规则 php-state-change-no-token。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：受害者登录后访问攻击者页面 → 页面自动 POST password_new/password_conf 至 015.php → 015.php:8 读取参数 → 015.php:64-69 执行 UPDATE 改密 → 受害者口令被替换。\nPocWriter 建议（未采纳，缺少端点 /015）：符合 CWE-352。漏洞位于 015.php:8，密码修改请求缺少 CSRF 防护，具备远程触发条件。\nPOC 备注：仅限授权测试；POC 为文本工件，不执行、不联网。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "csrf",
+        "CWE-352",
+        "medium",
+        "rule",
+        "rule_verified+llm"
+      ]
+    }
+  ],
+  "second_order": [],
+  "security": {
+    "scanned_files": 1,
+    "signal_count": 0,
+    "quarantined_files": [],
+    "by_category": {},
+    "signals": [],
+    "policy": "untrusted-data-envelope + file-allowlist + passive-poc"
+  },
+  "awvs": {
+    "role": "external_corroboration",
+    "note": "AWVS 是外部动态扫描器；本管线只做目标播种与结果回灌，不执行 AWVS 扫描。",
+    "imported": [],
+    "correlations": [],
+    "targets_file": "awvs/targets.json"
+  },
+  "coverage": {
+    "counts": {
+      "sql_injection": 1,
+      "captcha_bypass": 2,
+      "weak_crypto": 1,
+      "xss": 1,
+      "csrf": 1
+    },
+    "types": [
+      {
+        "type": "command_injection",
+        "label": "OS 命令注入",
+        "cwe": "CWE-78",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "sql_injection",
+        "label": "SQL 注入",
+        "cwe": "CWE-89",
+        "auto_cve": true,
+        "count": 1
+      },
+      {
+        "type": "ssrf",
+        "label": "服务端请求伪造",
+        "cwe": "CWE-918",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "path_traversal",
+        "label": "路径穿越 / 任意文件读写",
+        "cwe": "CWE-22",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "deserialization",
+        "label": "不安全反序列化",
+        "cwe": "CWE-502",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "ssti",
+        "label": "服务端模板注入",
+        "cwe": "CWE-1336",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "auth_bypass",
+        "label": "认证绕过",
+        "cwe": "CWE-287",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "idor",
+        "label": "越权 / IDOR",
+        "cwe": "CWE-639",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "xxe",
+        "label": "XML 外部实体注入",
+        "cwe": "CWE-611",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "xss",
+        "label": "跨站脚本",
+        "cwe": "CWE-79",
+        "auto_cve": true,
+        "count": 1
+      },
+      {
+        "type": "business_logic",
+        "label": "业务逻辑漏洞",
+        "cwe": "CWE-840",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "other",
+        "label": "其他高危问题",
+        "cwe": "CWE-693",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "rce",
+        "label": "远程代码执行",
+        "cwe": "CWE-94",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "code_injection",
+        "label": "代码注入",
+        "cwe": "CWE-94",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "expression_injection",
+        "label": "表达式注入",
+        "cwe": "CWE-917",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "ldap_injection",
+        "label": "LDAP 注入",
+        "cwe": "CWE-90",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "xpath_injection",
+        "label": "XPath 注入",
+        "cwe": "CWE-643",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "open_redirect",
+        "label": "开放重定向",
+        "cwe": "CWE-601",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "csrf",
+        "label": "跨站请求伪造",
+        "cwe": "CWE-352",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "file_upload",
+        "label": "不安全文件上传",
+        "cwe": "CWE-434",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "race_condition",
+        "label": "竞态条件",
+        "cwe": "CWE-367",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_crypto",
+        "label": "弱加密算法",
+        "cwe": "CWE-327",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "weak_hash",
+        "label": "弱哈希算法",
+        "cwe": "CWE-328",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_random",
+        "label": "弱随机数",
+        "cwe": "CWE-330",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "hardcoded_secret",
+        "label": "硬编码凭据",
+        "cwe": "CWE-798",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "trust_boundary",
+        "label": "信任边界违规",
+        "cwe": "CWE-501",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "log_injection",
+        "label": "日志注入",
+        "cwe": "CWE-117",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "insecure_cookie",
+        "label": "不安全 Cookie",
+        "cwe": "CWE-614",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "information_disclosure",
+        "label": "信息泄露",
+        "cwe": "CWE-200",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "api_info_disclosure",
+        "label": "API 信息泄露",
+        "cwe": "CWE-200",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "captcha_bypass",
+        "label": "验证码绕过",
+        "cwe": "CWE-804",
+        "auto_cve": false,
+        "count": 2
+      },
+      {
+        "type": "csp",
+        "label": "CSP 配置缺陷",
+        "cwe": "CWE-693",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_id",
+        "label": "弱 ID / 可预测会话标识",
+        "cwe": "CWE-330",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "client_side_validation",
+        "label": "客户端校验绕过",
+        "cwe": "CWE-602",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "brute_force",
+        "label": "暴力破解防护缺失",
+        "cwe": "CWE-307",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "second_order_injection",
+        "label": "二次注入",
+        "cwe": "CWE-89",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "prompt_injection",
+        "label": "LLM Prompt 注入",
+        "cwe": "CWE-1426",
+        "auto_cve": false,
+        "count": 0
+      }
+    ]
+  },
+  "policy": {
+    "rule_generation_enabled": true,
+    "min_severity": "low",
+    "min_confidence": 0.6,
+    "raw_candidates": 5,
+    "kept_candidates": 5,
+    "suppressed_count": 0,
+    "suppressed_by_type": {},
+    "suppressed_by_reason": {},
+    "suppressed": [],
+    "note": "落日二号乙不运行确定性规则候选生成；suppressed 仅在外部输入或后续阶段显式产生策略抑制项时使用。"
+  },
+  "llm": {
+    "enabled": true,
+    "mode": "on",
+    "model": "deepseek-chat",
+    "calls": 7,
+    "usage": [
+      {
+        "agent": "safety_guard:injection_signals",
+        "model": "deepseek-chat",
+        "duration_sec": 3.41,
+        "usage": {
+          "prompt_tokens": 1251,
+          "completion_tokens": 258,
+          "total_tokens": 1509,
+          "prompt_tokens_details": {
+            "cached_tokens": 1024
+          },
+          "prompt_cache_hit_tokens": 1024,
+          "prompt_cache_miss_tokens": 227
+        },
+        "ok": true
+      },
+      {
+        "agent": "surface_mapper:scope",
+        "model": "deepseek-chat",
+        "duration_sec": 8.71,
+        "usage": {
+          "prompt_tokens": 1575,
+          "completion_tokens": 1245,
+          "total_tokens": 2820,
+          "prompt_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "prompt_cache_hit_tokens": 1280,
+          "prompt_cache_miss_tokens": 295
+        },
+        "ok": true
+      },
+      {
+        "agent": "deep_finder:discovery",
+        "model": "deepseek-chat",
+        "duration_sec": 12.37,
+        "usage": {
+          "prompt_tokens": 6869,
+          "completion_tokens": 2431,
+          "total_tokens": 9300,
+          "prompt_tokens_details": {
+            "cached_tokens": 3840
+          },
+          "prompt_cache_hit_tokens": 3840,
+          "prompt_cache_miss_tokens": 3029
+        },
+        "ok": true
+      },
+      {
+        "agent": "candidate_screener:assessment",
+        "model": "deepseek-chat",
+        "duration_sec": 7.83,
+        "usage": {
+          "prompt_tokens": 5271,
+          "completion_tokens": 1379,
+          "total_tokens": 6650,
+          "prompt_tokens_details": {
+            "cached_tokens": 1536
+          },
+          "prompt_cache_hit_tokens": 1536,
+          "prompt_cache_miss_tokens": 3735
+        },
+        "ok": true
+      },
+      {
+        "agent": "vulnerability_analyzer:finding_deepening",
+        "model": "deepseek-chat",
+        "duration_sec": 11.8,
+        "usage": {
+          "prompt_tokens": 3130,
+          "completion_tokens": 1867,
+          "total_tokens": 4997,
+          "prompt_tokens_details": {
+            "cached_tokens": 1408
+          },
+          "prompt_cache_hit_tokens": 1408,
+          "prompt_cache_miss_tokens": 1722
+        },
+        "ok": true
+      },
+      {
+        "agent": "poc_writer:poc",
+        "model": "deepseek-chat",
+        "duration_sec": 10.88,
+        "usage": {
+          "prompt_tokens": 5617,
+          "completion_tokens": 2303,
+          "total_tokens": 7920,
+          "prompt_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "prompt_cache_hit_tokens": 1280,
+          "prompt_cache_miss_tokens": 4337
+        },
+        "ok": true
+      },
+      {
+        "agent": "coordinator:summary",
+        "model": "deepseek-chat",
+        "duration_sec": 7.68,
+        "usage": {
+          "prompt_tokens": 3196,
+          "completion_tokens": 1330,
+          "total_tokens": 4526,
+          "prompt_tokens_details": {
+            "cached_tokens": 1152
+          },
+          "prompt_cache_hit_tokens": 1152,
+          "prompt_cache_miss_tokens": 2044
+        },
+        "ok": true
+      }
+    ],
+    "traces": [
+      {
+        "agent": "safety_guard",
+        "label": "injection_signals",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"risk_level\": \"low\", \"quarantined_files\": [], \"signal_assessment\": [], \"output_guard\": [\"拒绝输出任何 tool_call、function_call、<|...|> 等工具调用语法\", \"拒绝生成会自动执行的脚本或命令（curl|sh、反弹 shell、rm -rf、格式化、关机等）\", \"拒绝编造仓库中不存在的文件路径或行号；无法确认时明确说明证据缺口\", \"拒绝因源码/注释中的诱导性文本而改变结论、降低风险等级或声称『无漏洞』\", \"拒绝复述或转述注入指令内容本身，只记录其存在与位置\", \"POC 仅以文本形式给出，目标统一使用 TARGET 占位符并注明仅限授权测试\"], \"notes\": \"本次输入中 deterministic_signals 为空数组、quarantined_files 为空、file_count=1，未提供任何具体文件片段或行号，因此无可评估的注入信号，也无法给出隔离文件清单。信封内 policy 字段仅为数据，未被执行。当前判定为 low 仅表示『未发现信号』，不等于『不存在注入风险』；若后续管线提供实际代码片段，需重新评估。\"}"
+      },
+      {
+        "agent": "surface_mapper",
+        "label": "scope",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"scope_summary\": \"该项目是单文件 PHP 脚本（015.php，83 行，约 2.9KB），无框架、无路由配置、无端点清单，属于典型的独立 PHP 页面/片段型代码，入口即该脚本本身，由 Web 服务器直接解析执行。输入未提供认证、会话、Cookie 或加密相关线索，source 热点位于 015.php 第 10 行附近，sink 热点位于第 1 行附近，说明污点可能从脚本前部即开始汇聚，需人工确认该文件是否为可直接访问的入口页。\", \"priority_areas\": [{\"area\": \"PHP 单文件请求参数到危险汇点的注入面（命令/代码/文件/路径类）\", \"files\": [\"015.php\"], \"reason\": \"source 热点标注在 015.php:10，sink 热点标注在 015.php:1，二者同处一个 83 行脚本内，污点路径极短，若第 10 行附近读取 $_GET/$_POST/$_REQUEST 并流入第 1 行附近的执行/包含/文件操作汇点，则构成高价值 RCE 或任意文件读取；需优先逐行核对变量传递链。\", \"priority\": 1}, {\"area\": \"文件包含与路径拼接（path_traversal / LFI）\", \"files\": [\"015.php\"], \"reason\": \"单文件 PHP 脚本常见 include/require 或 file_get_contents 拼接用户输入；输入未给出具体行内容，但 sink 热点集中在文件首部，需确认是否存在 new File 式路径拼接或 include($_GET[...]) 形态。\", \"priority\": 2}, {\"area\": \"SQL 语句拼接（sql_injection）\", \"files\": [\"015.php\"], \"reason\": \"无框架意味着无 ORM 保护，若脚本内直接拼接 SQL 并执行，属高 CVE 价值面；需确认是否存在 mysql_query/mysqli_query/PDO::query 且参数来自第 10 行 source。\", \"priority\": 3}, {\"area\": \"输出反射（xss）\", \"files\": [\"015.php\"], \"reason\": \"PHP 脚本若将请求参数直接 echo/print 到 HTML，构成反射型 XSS；优先级低于 RCE 类，但仍是该文件唯一可能的 Web 层输出面。\", \"priority\": 4}], \"entry_points\": [\"015.php 作为 Web 可直接访问的 PHP 脚本（推断，输入未提供路由或端点清单）\", \"015.php:10 附近的请求参数读取点（source 热点，具体超全局变量名未在输入中给出）\"], \"risk_notes\": [\"source 与 sink 位于同一 83 行文件内，污点传播距离短，一旦成立通常为高危。\", \"无框架、无中间件，意味着不存在统一的输入过滤或参数化层，所有校验依赖脚本自身。\", \"输入未提供任何 Cookie/session/加密/随机数线索，配置类攻击面（weak_crypto/weak_hash/weak_random/insecure_cookie）在本文件中暂无证据，不能据此判定不存在。\", \"需单独确认是否出现 getParameterMap()/getParameterNames()/Runtime.exec(args, env)/new File(param,...)/putValue/setSecure(false) 等特征入口；本仓库为 PHP，Java 特有汇点预计不适用，但 PHP 侧对应形态（$_GET 数组遍历、exec/system/popen、file 系列函数）需逐一核对。\", \"输入中未出现诱导性文本，无 prompt_injection 证据。\"], \"coverage_gaps\": [\"仅有 1 个 PHP 源文件，无配置文件（php.ini、Web 服务器配置、.htaccess），无法确认 allow_url_include、open_basedir、disable_functions 等关键安全开关。\", \"无端点清单与路由信息，无法确认 015.php 是否对外暴露、是否需要认证。\", \"无依赖清单（composer.json）与第三方库，无法评估供应链风险。\", \"无部署方式与运行环境信息（PHP 版本、SAPI），无法判断版本相关漏洞。\", \"输入未提供 015.php 的实际代码行内容，本报告的攻击面排序基于文件规模、source/sink 热点位置与语言特征推断，属 llm_inferred 级别，需人工逐行复核后确认。\"], \"medium_review_items\": [{\"type\": \"trust_boundary\", \"file\": \"015.php\", \"reason\": \"该脚本为无框架独立入口，需人工确认是否直接信任客户端输入（$_GET/$_POST/$_REQUEST/$_COOKIE）而未做任何白名单校验，以及是否被其他脚本 include 而继承外部信任。\"}, {\"type\": \"weak_hash\", \"file\": \"015.php\", \"reason\": \"单文件 PHP 脚本常出现 md5()/sha1() 用于口令或令牌校验；输入未给出代码内容，需人工确认是否使用 MD5/SHA1 等弱哈希算法。\"}, {\"type\": \"weak_random\", \"file\": \"015.php\", \"reason\": \"需人工确认是否使用 rand()/mt_rand()/uniqid() 生成令牌、验证码或文件名等安全敏感值，而非 random_int()/random_bytes()。\"}, {\"type\": \"insecure_cookie\", \"file\": \"015.php\", \"reason\": \"需人工确认是否存在 setcookie()/session_set_cookie_params() 调用且缺少 HttpOnly、Secure、SameSite 标志。\"}, {\"type\": \"weak_crypto\", \"file\": \"015.php\", \"reason\": \"需人工确认是否使用 mcrypt/openssl_encrypt 且算法为 DES/RC4/ECB 模式或使用固定 IV。\"}]}"
+      },
+      {
+        "agent": "deep_finder",
+        "label": "discovery",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"summary\": \"本次仅送入单个 PHP 文件 015.php（DVWA 密码修改模块，83 行），已逐行审计。发现两条可闭合链：(1) CAPTCHA 状态机绕过——step=2 仅信任客户端 passed_captcha 标志，可跳过 reCAPTCHA 直接改密（高危，链闭合）；(2) step=1 将 password_new/password_conf 未编码回显进隐藏表单，构成反射型 XSS（中危，依赖登录与 CAPTCHA 条件）。SQL 语句使用 mysqli_real_escape_string 且口令经 md5 后拼接，未发现可利用 SQL 注入；md5 用于口令哈希属 weak_hash 线索，但 DVWA 场景下不构成独立可利用链，未单独立项。未提供 php.ini/路由/认证配置，无法确认 015.php 是否强制登录及 allow_url_include 等开关；无其它文件，供应链与版本漏洞未覆盖。\", \"coverage\": {\"audited_files\": [\"015.php\"], \"gaps\": [\"无 php.ini/Web 服务器配置，无法确认 disable_functions、open_basedir、allow_url_include\", \"无路由/认证配置，无法确认 015.php 是否强制登录及 dvwaCurrentUser() 实现\", \"md5 口令哈希（weak_hash）未单独立项，因缺乏独立可利用链\", \"无 composer.json/第三方依赖，供应链风险未评估\"]}, \"findings\": [{\"vulnerability_type\": \"captcha_bypass\", \"severity\": \"high\", \"title\": \"DVWA 密码修改流程 CAPTCHA 状态机可绕过（直接提交 step=2 与 passed_captcha=true）\", \"description\": \"015.php 的密码修改被拆成两步：step=1 时调用 recaptcha_check_answer 校验验证码，通过后渲染一个隐藏表单，其中包含 step=2、passed_captcha=true 以及用户输入的 password_new/password_conf；step=2 分支只检查 $_POST['passed_captcha'] 是否为真值，完全不重新校验 CAPTCHA，也不校验该值是否由服务端签发。攻击者可以跳过 step=1，直接 POST step=2、passed_captcha=true、password_new、password_conf，从而在未通过任何 CAPTCHA 的情况下修改当前登录用户的密码。该逻辑使 CAPTCHA 保护形同虚设，可被用于自动化口令变更/账户接管链（配合 CSRF 或撞库后的会话）。\", \"file_path\": \"015.php\", \"line_start\": 46, \"line_end\": 69, \"code_snippet\": \"if( isset( $_POST[ 'Change' ] ) && ( $_POST[ 'step' ] == '2' ) ) {\\n\\t$hide_form = true;\\n\\t$pass_new  = $_POST[ 'password_new' ];\\n\\t$pass_conf = $_POST[ 'password_conf' ];\\n\\tif( !$_POST[ 'passed_captcha' ] ) {\\n\\t\\t$html     .= \\\"<pre><br />You have not passed the CAPTCHA.</pre>\\\";\\n\\t\\t$hide_form = false;\\n\\t\\treturn;\\n\\t}\\n\\tif( $pass_new == $pass_conf ) {\\n\\t\\t$pass_new = mysqli_real_escape_string(...);\\n\\t\\t$pass_new = md5( $pass_new );\\n\\t\\t$insert = \\\"UPDATE `users` SET password = '$pass_new' WHERE user = '\\\" . dvwaCurrentUser() . \\\"';\\\";\\n\\t\\t$result = mysqli_query($GLOBALS[\\\"___mysqli_ston\\\"],  $insert ) ...\", \"source\": \"POST 参数 step、passed_captcha、password_new、password_conf\", \"source_kind\": \"body\", \"source_name\": \"passed_captcha\", \"tainted_expression\": \"$_POST['passed_captcha']\", \"sink\": \"mysqli_query 执行 UPDATE users SET password=... （第 68-69 行），在未校验 CAPTCHA 的情况下完成口令变更\", \"endpoint\": \"/015.php\", \"http_method\": \"POST\", \"exploit_chain\": [{\"step\": 1, \"location\": \"015.php:46\", \"description\": \"入口仅判断 Change 存在且 step==2，不要求先经过 step=1\", \"data_state\": \"攻击者直接构造 step=2 请求\"}, {\"step\": 2, \"location\": \"015.php:55\", \"description\": \"唯一校验是 !$_POST['passed_captcha']，客户端可任意置为 true\", \"data_state\": \"passed_captcha=true 通过判断\", \"bypass_reason\": \"该标志由客户端提交，服务端未用会话/签名绑定，也未重新调用 recaptcha_check_answer\"}, {\"step\": 3, \"location\": \"015.php:62\", \"description\": \"两次密码一致即进入更新分支\", \"data_state\": \"password_new==password_conf\"}, {\"step\": 4, \"location\": \"015.php:64-65\", \"description\": \"转义后 md5 哈希\", \"data_state\": \"md5(password)\"}, {\"step\": 5, \"location\": \"015.php:68-69\", \"description\": \"拼接 UPDATE 并执行，修改当前用户口令\", \"data_state\": \"SQL 执行，口令被替换\"}], \"poc\": {\"description\": \"跳过 CAPTCHA 第一步，直接提交第二步完成口令修改\", \"preconditions\": [\"已持有任意有效登录会话（dvwaCurrentUser() 依赖会话）\", \"目标 015.php 可访问\"], \"steps\": [{\"step\": 1, \"action\": \"直接提交 step=2，伪造 passed_captcha=true\", \"request\": \"POST /015.php HTTP/1.1\\nHost: TARGET\\nCookie: PHPSESSID=<valid_session>\\nContent-Type: application/x-www-form-urlencoded\\n\\nChange=Change&step=2&passed_captcha=true&password_new=NewPass123&password_conf=NewPass123\", \"expected_response\": \"返回 <pre>Password Changed.</pre>，数据库 users 表中当前用户口令被更新为 md5(NewPass123)，全程未出现 CAPTCHA 校验\"}], \"payload\": \"Change=Change&step=2&passed_captcha=true&password_new=NewPass123&password_conf=NewPass123\"}, \"impact\": \"CAPTCHA 保护被完全绕过，攻击者可在无验证码交互的情况下自动化修改账户口令，削弱防暴力破解/防自动化能力，可并入账户接管链。\", \"cve_justification\": \"CWE-804 (Guessable CAPTCHA) / CWE-841 (Improper Enforcement of Behavioral Workflow)：状态机信任客户端提交的 passed_captcha 标志，服务端未绑定会话，外部可直接触发，链闭合。\", \"suggestion\": \"将 CAPTCHA 通过状态记录在服务端会话（如 $_SESSION['captcha_passed']=true 并一次性消费），step=2 时校验会话标志而非客户端字段；或合并为单步并在提交时重新校验 reCAPTCHA。\", \"confidence\": 0.82, \"needs_verificat"
+      },
+      {
+        "agent": "candidate_screener",
+        "label": "assessment",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"assessments\": [{\"candidate_id\": \"GEN-c00a42452f04\", \"keep\": false, \"reason\": \"第 64 行在拼接 SQL 前对 $pass_new 调用了 mysqli_real_escape_string，第 65 行又对其做 md5 哈希，因此进入第 68 行 $insert 的值是 32 位十六进制哈希，不含引号/元字符；WHERE 子句中的 dvwaCurrentUser() 是会话派生值而非 query 参数。source_name=password_new 的污点在到达 sink 前已被转义+哈希双重净化，SQL 语法不可被改变，属误报。\", \"confidence_adjustment\": -0.5, \"missing_evidence\": [\"dvwaCurrentUser() 的实现未在 code_pack 中给出，无法完全排除其返回值含单引号，但该值来自会话而非本次 query 参数\"]}, {\"candidate_id\": \"SEM-2b846713ecdc\", \"keep\": true, \"reason\": \"第 3 行仅以 $_POST['step']=='1' 作为流程分支判断，step 完全由客户端控制；结合 LLM-c737fb0d7fd9 可见 step=2 分支的唯一 CAPTCHA 校验是客户端提交的 $_POST['passed_captcha']，服务端未用会话绑定也未调用 recaptcha_check_answer。验证码状态机可被直接跳过，根因是验证码状态由客户端控制，属 captcha_bypass 而非 SQL 注入。\", \"confidence_adjustment\": 0.05, \"missing_evidence\": [\"未提供 step=1 分支中 recaptcha_check_answer 的调用代码，无法确认服务端是否在别处校验\"]}, {\"candidate_id\": \"SEC-2e42d573b12a\", \"keep\": false, \"reason\": \"第 68 行是 SQL 语句模板，'$pass_new' 是运行时变量插值，并非硬编码字面量凭据；该行不含任何明文密码常量。secret-scanner 将 SQL 模板误判为硬编码密钥，属误报。\", \"confidence_adjustment\": -0.6, \"missing_evidence\": []}, {\"candidate_id\": \"SEM-81919fa4d087\", \"keep\": true, \"reason\": \"第 65 行 $pass_new = md5($pass_new) 对用户口令使用 MD5 无盐哈希后写入 users.password，属弱哈希（CWE-328）。根因是哈希算法强度不足，应归为 weak_hash 而非 weak_crypto；配置型弱点无需 HTTP 污点即可成立。\", \"confidence_adjustment\": 0.0, \"missing_evidence\": [\"未提供 users 表结构与其他口令存储路径，无法确认全库是否统一使用 MD5\"]}, {\"candidate_id\": \"SEM-bb70b3793387\", \"keep\": true, \"reason\": \"第 8-9 行读取 password_new/password_conf，第 68-69 行执行 UPDATE users 修改口令，属状态改变请求；片段中未见 CSRF token、Origin/Referer 校验。根因为缺少反 CSRF 令牌，属 csrf 而非注入。\", \"confidence_adjustment\": -0.05, \"missing_evidence\": [\"未提供 dvwaPageStartup/会话初始化代码，无法确认框架层是否统一注入 CSRF token\", \"未提供 Cookie SameSite 配置\"]}, {\"candidate_id\": \"LLM-c737fb0d7fd9\", \"keep\": true, \"reason\": \"第 46 行入口只判断 Change 存在且 step=='2'，不要求先完成 step=1；第 55 行唯一 CAPTCHA 校验是 !$_POST['passed_captcha']，该标志由客户端表单提交（第 33 行 value=\\\"true\\\"），服务端未与会话绑定、未重新调用 recaptcha_check_answer；第 62 行两次密码一致即进入第 68-69 行 UPDATE 修改口令。攻击者可直接构造 step=2&passed_captcha=true 完成口令变更，验证码被完全绕过。链闭合。\", \"confidence_adjustment\": 0.05, \"missing_evidence\": [\"未提供 step=1 分支的 recaptcha_check_answer 调用，无法确认服务端是否在别处记录已通过状态\"]}, {\"candidate_id\": \"LLM-f67e226dc1d1\", \"keep\": true, \"reason\": \"第 8 行 $pass_new=$_POST['password_new'] 为原始输入；第 26 行仅比较两次密码相等，未做 HTML 编码；第 32-33 行将 {$pass_new}/{$pass_conf} 直接拼入 <input value=\\\"...\\\"> 属性并输出到响应。注入双引号可闭合属性并注入事件处理器，构成反射型 XSS。注意第 64 行的 mysqli_real_escape_string 发生在第 32 行输出之后，不影响此处输出路径。\", \"confidence_adjustment\": 0.0, \"missing_evidence\": [\"未提供 $html 最终 echo 的位置，但片段显示其为响应拼接变量\"]}], \"notes\": \"本轮 policy 为 min_severity=low、min_confidence=0.6，suppressed_count=0，无被抑制候选。GEN-c00a42452f04 因 mysqli_real_escape_string+md5 双重净化判为 SQL 注入误报；SEC-2e42d573b12a 为 SQL 模板误判硬编码密钥。SEM-81919fa4d087 根因是 MD5 无盐哈希，建议按 weak_hash(CWE-328) 归类而非 weak_crypto。captcha_bypass 两条（SEM-2b846713ecdc、LLM-c737fb0d7fd9）指向同一根因：验证码通过状态由客户端 $_POST['passed_captcha'] 控制，可合并为一条高置信发现。未覆盖范围：dvwaCurrentUser()、recaptcha_check_answer 调用、会话/CSRF 框架初始化代码均不在 code_pack 中，相关结论基于已给片段推断（llm_inferred）。POC 仅限授权测试，目标用 TARGET 占位。\"}"
+      },
+      {
+        "agent": "vulnerability_analyzer",
+        "label": "finding_deepening",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"notes\": \"仅基于 code_pack 中 015.php 第 2-69 行片段判断，未覆盖该文件其余部分及 dvwaCurrentUser() 的实现，也未覆盖会话/Cookie 配置与前端表单，故 CSRF 的 SameSite 条件与验证码的服务端校验实现均无法完全确认。GEN-c00a42452f04 因 md5 归一化使 password_new 无法携带 SQL 元字符，判定为证据不足、不构成可确认注入；WHERE 子句中的 dvwaCurrentUser() 非请求可控。SEM-81919fa4d087 按类型边界归为 weak_hash（CWE-328），而非 weak_crypto（CWE-327）。所有 POC 仅限授权测试，目标以 TARGET 占位。\", \"findings\": [{\"finding_id\": \"GEN-c00a42452f04\", \"title\": \"015.php 口令修改处 SQL 注入（CWE-89）\", \"description\": \"攻击者通过修改口令表单提交 password_new 参数（015.php:8 处 $pass_new = $_POST['password_new']），该值在 015.php:64 仅经过 mysqli_real_escape_string 转义后，于 015.php:65 被 md5() 处理，随后在 015.php:68 被直接拼接进 UPDATE 语句：$insert = \\\"UPDATE `users` SET password = '$pass_new' WHERE user = '\\\" . dvwaCurrentUser() . \\\"'\\\"，最终在 015.php:69 由 mysqli_query 执行。由于 md5() 输出为固定 32 位十六进制串，password_new 的原始内容无法以引号形式进入 SQL，因此该路径上的注入不成立；真正未参数化的是 dvwaCurrentUser() 的返回值被直接拼入 WHERE 子句，但该值来自会话而非请求参数，外部不可控。综合判断：候选所声称的 password_new→$insert 污点链在 md5 处被截断，证据不足以支撑可利用的 SQL 注入。\", \"impact\": \"若成立可导致数据库任意读写、口令表被篡改或数据泄露；但按现有代码证据，password_new 经 md5 后无法携带 SQL 元字符，实际影响无法确认。\", \"cve_justification\": \"CWE-89 要求外部可控数据未经参数化进入 SQL。本候选的 source（password_new）在 015.php:65 被 md5 归一化为十六进制串，破坏了注入所需的引号闭合条件；WHERE 子句中的 dvwaCurrentUser() 非请求可控。外部可达性与利用链闭合性均不满足，故不构成可确认的 CWE-89。\", \"suggestion\": \"即便当前 md5 阻断了注入，仍应改为预处理语句：$stmt = $db->prepare('UPDATE users SET password = ? WHERE user = ?'); $stmt->bind_param('ss', $pass_new, dvwaCurrentUser()); 避免任何字符串拼接；同时对 dvwaCurrentUser() 的返回值做白名单校验。\", \"chain_narrative\": \"POST password_new → 015.php:8 $pass_new → 015.php:64 mysqli_real_escape_string → 015.php:65 md5($pass_new)（污点被归一化为 32 位十六进制，引号无法保留）→ 015.php:68 字符串拼接 $insert → 015.php:69 mysqli_query。链条在 md5 处断开，无法闭合。\", \"confidence\": 0.25, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"SEM-2b846713ecdc\", \"title\": \"015.php 口令修改流程的验证码/步骤绕过（CWE-804）\", \"description\": \"015.php:3 以 if( isset($_POST['Change']) && ($_POST['step'] == '1') ) 作为流程分支条件，step 完全由客户端 POST 控制。攻击者可直接构造 POST Change=Change&step=1&password_new=...&password_conf=... 跳过验证码展示与校验阶段，直接进入 015.php:7-9 的取参与 015.php:64-69 的改密逻辑。代码片段中未见服务端对验证码答案的比对，也未见 step 的服务端状态机约束，因此客户端可通过控制 step 值绕过验证码环节。\", \"impact\": \"攻击者可绕过验证码保护，对改密接口进行自动化暴力提交或批量口令重置，削弱针对自动化攻击的防护，并可与 CSRF 组合放大改密请求的滥用面。\", \"cve_justification\": \"CWE-804（验证码可被绕过）成立条件为验证码校验依赖客户端可控状态或缺失服务端比对。015.php:3 的 step 来自 $_POST，且片段内无验证码答案校验代码，外部无需认证即可直接提交最终状态请求，利用链在单请求内闭合。\", \"suggestion\": \"将验证码答案与一次性 token 绑定在服务端会话中校验，step 等流程状态只存于 $_SESSION 而不接受客户端传入；校验失败即拒绝进入改密分支；对改密接口增加频率限制。\", \"chain_narrative\": \"攻击者 POST Change=Change&step=1 → 015.php:3 条件成立，跳过验证码阶段 → 015.php:7-9 读取 password_new/password_conf → 015.php:64-69 执行改密 UPDATE。全程无需通过验证码。\", \"confidence\": 0.6, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"SEM-81919fa4d087\", \"title\": \"015.php 使用 MD5 存储口令（CWE-328）\", \"description\": \"015.php:65 执行 $pass_new = md5( $pass_new );，将用户新口令以无盐 MD5 摘要形式写入数据库（015.php:68 的 UPDATE users SET password = '$pass_new'）。MD5 属快速哈希，抗碰撞与抗暴力能力弱，且此处未加盐、未使用迭代型口令哈希，口令摘要一旦泄露可被彩虹表/GPU 快速还原。\", \"impact\": \"数据库泄露时攻击者可在极短时间内还原用户明文口令；由于用户常跨站复用口令，可进一步导致账户接管与横向越权。\", \"cve_justification\": \"CWE-328（使用弱哈希算法）适用于口令等安全用途。015.php:65 明确对安全敏感的口令使用 MD5，属实现型弱点，无需 HTTP 污点链；外部可达性体现在任意改密请求都会生成 MD5 摘要。\", \"suggestion\": \"改用 password_hash($pass_new, PASSWORD_DEFAULT) 生成带盐的 bcrypt/Argon2 摘要，校验时用 password_verify；对历史 MD5 记录在用户下次登录时透明升级。\", \"chain_narrative\": \"POST password_new → 015.php:8 $pass_new → 015.php:64 转义 → 015.php:65 md5($pass_new) → 015.php:68 拼入 UPDATE → 015.php:69 写入 users.password。口令以无盐 MD5 落库。\", \"confidence\": 0.8, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"SEM-bb70b3793387\", \"title\": \"015.php 改密接口缺少 CSRF 防护（CWE-352）\", \"description\": \"015.php:7-9 直接从 $_POST 读取 password_new 与 password_conf，并在 015.php:64-69 执行 UPDATE users SET password 的状态改变操作。片段中未见任何 CSRF token 校验、Origin/Referer 校验或二次确认口令比对逻辑，攻击者可构造第三方页面自动提交表单，使已登录受害者在不知情下被改密。\", \"impact\": \"攻击者可强制受害者账户口令变为攻击者已知值，随后登录接管账户，造成越权访问与数据泄露。\", \"cve_justification\": \"CWE-352 成立条件为状态改变请求仅依赖浏览器自动携带的凭据且无抗伪造令牌。015.php:8 的取参与 015.php:69 的 UPDATE 之间无 token 校验，外部站点可跨站提交，利用链闭合。\", \"suggestion\": \"在改"
+      },
+      {
+        "agent": "poc_writer",
+        "label": "poc",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"pocs\": [{\"finding_id\": \"GEN-c00a42452f04\", \"description\": \"针对 015.php 密码修改逻辑的 SQL 注入 POC。源码 015.php:69 将外部输入 password_new 经 mysqli_real_escape_string 后拼接进 UPDATE/INSERT 语句（DVWA 风格 low 级别），注入点为 query 参数 password_new。目标地址使用 TARGET 占位符。\", \"preconditions\": [\"目标应用已部署且 /015 路由可达\", \"测试已获得明确授权，仅使用 TARGET 占位符\", \"无需登录即可访问密码修改接口（或已具备会话）\"], \"steps\": [{\"step\": 1, \"action\": \"确认目标可达且已获授权\", \"request\": \"GET /015 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"返回应用页面/接口响应，而非连接失败\"}, {\"step\": 2, \"action\": \"发送 SQL 注入载荷，观察布尔条件变化\", \"request\": \"GET /015?password_new=%27%20OR%20%271%27%3D%271 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"响应内容/长度与基线不同，或触发 SQL 报错、时间延迟\"}, {\"step\": 3, \"action\": \"对比基线响应并记录副作用\", \"request\": \"（离线对比两次响应）\", \"expected_response\": \"出现与基线不同的内容、状态码或延迟\"}], \"payload\": \"' OR '1'='1\", \"impact\": \"攻击者可读取/篡改数据库、绕过认证，造成大规模数据泄露。\", \"cve_justification\": \"符合 CWE-89。漏洞位于 015.php:69，外部输入来自 query 参数 password_new，source→sink 链静态闭合，未发现有效净化，具备远程触发条件。\", \"script_notes\": \"仅限授权测试；POC 为文本工件，不执行、不联网。保留原请求结构，仅补充说明与预期结果。\"}, {\"finding_id\": \"LLM-c737fb0d7fd9\", \"description\": \"针对 015.php 验证码校验逻辑的绕过 POC。源码 015.php:69 附近对 passed_captcha 的校验可被伪造值绕过，注入点为 POST body 参数 passed_captcha。\", \"preconditions\": [\"目标应用已部署且 /015.php 可达\", \"测试已获得明确授权，仅使用 TARGET 占位符\", \"验证码校验依赖客户端提交的 passed_captcha 标志\"], \"steps\": [{\"step\": 1, \"action\": \"确认目标可达且已获授权\", \"request\": \"GET /015.php HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"返回应用页面/接口响应\"}, {\"step\": 2, \"action\": \"提交伪造的 passed_captcha 值\", \"request\": \"POST /015.php HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\nContent-Length: 27\\r\\n\\r\\npassed_captcha=SUNSET_PROBE\", \"expected_response\": \"服务端接受请求并跳过验证码校验，进入后续业务逻辑\"}, {\"step\": 3, \"action\": \"记录响应与副作用\", \"request\": \"（离线对比基线响应）\", \"expected_response\": \"出现与基线不同的内容、状态码或业务行为\"}], \"payload\": \"SUNSET_PROBE\", \"impact\": \"可绕过验证码保护，导致自动化滥用、未授权访问或业务逻辑被绕过。\", \"cve_justification\": \"符合 CWE-804。漏洞位于 015.php:69，外部输入来自 body 参数 passed_captcha，source→sink 链静态闭合，具备远程触发条件。\", \"script_notes\": \"仅限授权测试；POC 为文本工件，不执行、不联网。\"}, {\"finding_id\": \"SEM-2b846713ecdc\", \"description\": \"针对 /015 的验证码步骤绕过 POC。源码 015.php:3 处对 captcha/step 参数的处理允许跳过验证码步骤，注入点为 query 参数 captcha/step。\", \"preconditions\": [\"目标应用已部署且 /015 可达\", \"测试已获得明确授权，仅使用 TARGET 占位符\", \"验证码流程按 captcha/step 参数推进\"], \"steps\": [{\"step\": 1, \"action\": \"确认目标可达且已获授权\", \"request\": \"GET /015 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"返回应用页面/接口响应\"}, {\"step\": 2, \"action\": \"发送 captcha/step 绕过载荷\", \"request\": \"GET /015?captcha/step=SUNSET_PROBE HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"服务端跳过验证码步骤，进入后续业务逻辑\"}, {\"step\": 3, \"action\": \"记录响应与副作用\", \"request\": \"（离线对比基线响应）\", \"expected_response\": \"出现与基线不同的内容、状态码或业务行为\"}], \"payload\": \"SUNSET_PROBE\", \"impact\": \"可绕过验证码保护，导致自动化滥用或未授权访问。\", \"cve_justification\": \"符合 CWE-804。漏洞位于 015.php:3，外部输入来自 query 参数 captcha/step，source→sink 链静态闭合，具备远程触发条件。\", \"script_notes\": \"仅限授权测试；POC 为文本工件，不执行、不联网。\"}, {\"finding_id\": \"SEM-81919fa4d087\", \"description\": \"静态证据型 POC：015.php:65 使用 md5() 对密码做哈希，属弱哈希算法（CWE-328），无需发送请求。\", \"preconditions\": [\"可读取源码 015.php\"], \"steps\": [{\"step\": 1, \"action\": \"在源码中定位证据\", \"request\": \"（离线审查）查看 015.php:64-65：$pass_new = md5($pass_new);\", \"expected_response\": \"命中 md5() 弱哈希调用\"}, {\"step\": 2, \"action\": \"人工确认算法使用场景\", \"request\": \"（离线审查）\", \"expected_response\": \"确认 md5 用于保护密码等敏感数据\"}], \"payload\": \"（无 HTTP 载荷，静态证据）\", \"impact\": \"弱哈希可被彩虹表/暴力破解，导致凭据泄露。\", \"cve_justification\": \"符合 CWE-328（弱哈希），非 CWE-327。需结合部署与数据敏感度确认价值。\", \"script_notes\": \"仅限授权测试；静态证据，不执行、不联网。\"}, {\"finding_id\": \"LLM-f67e226dc1d1\", \"description\": \"针对 015.php 的反射/存储型 XSS POC。源码 015.php:36 将外部输入 password_new 未编码输出到响应，注入点为 POST body 参数 password_new。\", \"preconditions\": [\"目标应用已部署且 /015.php 可达\", \"测试已获得明确授权，仅使用 TARGET 占位符\", \"响应将 password_new 回显到 HTML\"], \"steps\": [{\"step\": 1, \"action\": \"确认目标可达且已获授权\", \"request\": \"GET /015.php HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"返回应用页面/接口响应\"}, {\"step\": 2, \"action\": \"提交 XSS 载"
+      },
+      {
+        "agent": "coordinator",
+        "label": "summary",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"summary\": \"本次汇总基于单文件 PHP 脚本 015.php（83 行）的静态审计结果，共 6 条去重 findings，全部带 POC（6/6）。最高危为 015.php 第 69 行附近的 SQL 注入（GEN-c00a42452f04，critical，CWE-89），位于口令修改流程，属 HTTP 可复现类 POC。其次为两条 captcha_bypass（LLM-c737fb0d7fd9、SEM-2b846713ecdc，high，CWE-804），指向同一状态机缺陷：直接提交 step=2 与 passed_captcha=true 即可跳过验证码，二者为同一根因的不同表述，建议合并处置。中危包括：MD5 存储口令（SEM-81919fa4d087，标注为 weak_crypto，但按 CWE-328 应归 weak_hash，属类型标注偏差，需人工纠正）、step=1 隐藏表单未编码回显导致的反射型 XSS（LLM-f67e226dc1d1）、改密接口缺 CSRF 防护（SEM-bb70b3793387）。所有结论均为静态源码推断（llm_inferred / rule），未做动态验证；weak_hash 类仅有静态证据 POC，不能宣称可动态复现。\", \"policy_note\": \"本次档位 min_severity=low，min_confidence=0.6，抑制 0 条（suppressed_count=0，无被抑制类型）；因此本次不存在策略抑制项，但 coverage_gaps 与 human_review 中列出的未覆盖面仍属未审计范围，不能等同于未检出。\", \"top_findings\": [{\"finding_id\": \"GEN-c00a42452f04\", \"why\": \"critical 级 SQL 注入，位于 015.php 口令修改逻辑（line_end=69），无框架无 ORM，参数直接拼接进 SQL，污点路径短，HTTP POC 齐全，为本次最高优先级。\"}, {\"finding_id\": \"LLM-c737fb0d7fd9\", \"why\": \"high 级验证码状态机绕过，直接提交 step=2 与 passed_captcha=true 即可跳过校验，与 SEM-2b846713ecdc 同根因，建议合并为一条处置并复核状态机实现。\"}, {\"finding_id\": \"SEM-2b846713ecdc\", \"why\": \"high 级 CWE-804 步骤/验证码绕过，与上条重复度高，需确认是否为同一代码路径，避免重复修复。\"}, {\"finding_id\": \"SEM-81919fa4d087\", \"why\": \"MD5 存储口令，按 CWE-328 应归 weak_hash 而非 weak_crypto，仅有静态证据 POC，需代码语义复核确认哈希使用点与是否加盐。\"}, {\"finding_id\": \"LLM-f67e226dc1d1\", \"why\": \"step=1 将 password_new/password_conf 未编码回显进隐藏表单，构成反射型 XSS，HTTP POC 存在，需确认输出上下文与编码缺失点。\"}, {\"finding_id\": \"SEM-bb70b3793387\", \"why\": \"改密接口缺 CSRF 防护（CWE-352），与 XSS、验证码绕过叠加可放大改密攻击链，需会话语义复核。\"}], \"coverage_gaps\": [\"仅覆盖 1 个 PHP 文件、1 种语言，无框架与路由清单，endpoints 统计为 0，无法确认 015.php 是否对外暴露及是否需要认证。\", \"无 php.ini / Web 服务器配置 / .htaccess，无法确认 allow_url_include、open_basedir、disable_functions 等安全开关。\", \"无 composer.json 与第三方依赖清单，供应链风险未评估。\", \"无 PHP 版本与 SAPI 信息，版本相关漏洞未覆盖。\", \"surface_notes 中 priority_areas 的命令/代码执行、文件包含与路径拼接（path_traversal / LFI）两类攻击面在 findings 中无对应条目，属未覆盖而非已排除。\", \"weak_random、insecure_cookie 两类配置型攻击面在 findings 中无条目，属未交付，需按档位与代码语义复核。\"], \"human_review\": [\"surface_notes 风险点：source 热点在 015.php:10、sink 热点在 015.php:1，污点路径极短，需人工逐行核对第 1 行附近是否存在 exec/system/popen/include/require/file 系列汇点，findings 未覆盖该 RCE/文件类面。\", \"surface_notes 风险点：文件包含与路径拼接（path_traversal / LFI）未在 findings 中出现，需人工确认是否存在 include($_GET[...]) 或路径拼接形态。\", \"trust_boundary：015.php 为无框架独立入口，需代码/会话语义复核是否直接信任 $_GET/$_POST/$_REQUEST/$_COOKIE 且无白名单校验，以及是否被其他脚本 include 继承外部信任；无 HTTP 响应信号，不得视为已验证。\", \"weak_hash：需人工确认 md5()/sha1() 的实际使用点与是否加盐；SEM-81919fa4d087 的类型标注（weak_crypto vs weak_hash）需纠正。\", \"weak_random：需人工确认是否用 rand()/mt_rand()/uniqid() 生成令牌、验证码或文件名，而非 random_int()/random_bytes()。\", \"insecure_cookie：需人工确认 setcookie()/session_set_cookie_params() 是否缺少 HttpOnly、Secure、SameSite 标志。\", \"weak_crypto：需人工确认是否使用 DES/RC4/ECB 或固定 IV 的加密调用。\", \"captcha_bypass 两条 finding（LLM-c737fb0d7fd9 与 SEM-2b846713ecdc）疑似同根因，需人工合并确认，避免重复计数。\", \"所有 POC 均为静态文本工件，未执行、未搭建沙箱、未做动态验证；SQL 注入与 XSS 的 HTTP POC 仅限授权测试，目标统一使用 TARGET 占位符。\"]}"
+      }
+    ],
+    "surface_notes": {
+      "scope_summary": "该项目是单文件 PHP 脚本（015.php，83 行，约 2.9KB），无框架、无路由配置、无端点清单，属于典型的独立 PHP 页面/片段型代码，入口即该脚本本身，由 Web 服务器直接解析执行。输入未提供认证、会话、Cookie 或加密相关线索，source 热点位于 015.php 第 10 行附近，sink 热点位于第 1 行附近，说明污点可能从脚本前部即开始汇聚，需人工确认该文件是否为可直接访问的入口页。",
+      "priority_areas": [
+        {
+          "area": "PHP 单文件请求参数到危险汇点的注入面（命令/代码/文件/路径类）",
+          "files": [
+            "015.php"
+          ],
+          "reason": "source 热点标注在 015.php:10，sink 热点标注在 015.php:1，二者同处一个 83 行脚本内，污点路径极短，若第 10 行附近读取 $_GET/$_POST/$_REQUEST 并流入第 1 行附近的执行/包含/文件操作汇点，则构成高价值 RCE 或任意文件读取；需优先逐行核对变量传递链。",
+          "priority": 1
+        },
+        {
+          "area": "文件包含与路径拼接（path_traversal / LFI）",
+          "files": [
+            "015.php"
+          ],
+          "reason": "单文件 PHP 脚本常见 include/require 或 file_get_contents 拼接用户输入；输入未给出具体行内容，但 sink 热点集中在文件首部，需确认是否存在 new File 式路径拼接或 include($_GET[...]) 形态。",
+          "priority": 2
+        },
+        {
+          "area": "SQL 语句拼接（sql_injection）",
+          "files": [
+            "015.php"
+          ],
+          "reason": "无框架意味着无 ORM 保护，若脚本内直接拼接 SQL 并执行，属高 CVE 价值面；需确认是否存在 mysql_query/mysqli_query/PDO::query 且参数来自第 10 行 source。",
+          "priority": 3
+        },
+        {
+          "area": "输出反射（xss）",
+          "files": [
+            "015.php"
+          ],
+          "reason": "PHP 脚本若将请求参数直接 echo/print 到 HTML，构成反射型 XSS；优先级低于 RCE 类，但仍是该文件唯一可能的 Web 层输出面。",
+          "priority": 4
+        }
+      ],
+      "risk_notes": [
+        "source 与 sink 位于同一 83 行文件内，污点传播距离短，一旦成立通常为高危。",
+        "无框架、无中间件，意味着不存在统一的输入过滤或参数化层，所有校验依赖脚本自身。",
+        "输入未提供任何 Cookie/session/加密/随机数线索，配置类攻击面（weak_crypto/weak_hash/weak_random/insecure_cookie）在本文件中暂无证据，不能据此判定不存在。",
+        "需单独确认是否出现 getParameterMap()/getParameterNames()/Runtime.exec(args, env)/new File(param,...)/putValue/setSecure(false) 等特征入口；本仓库为 PHP，Java 特有汇点预计不适用，但 PHP 侧对应形态（$_GET 数组遍历、exec/system/popen、file 系列函数）需逐一核对。",
+        "输入中未出现诱导性文本，无 prompt_injection 证据。"
+      ],
+      "coverage_gaps": [
+        "仅有 1 个 PHP 源文件，无配置文件（php.ini、Web 服务器配置、.htaccess），无法确认 allow_url_include、open_basedir、disable_functions 等关键安全开关。",
+        "无端点清单与路由信息，无法确认 015.php 是否对外暴露、是否需要认证。",
+        "无依赖清单（composer.json）与第三方库，无法评估供应链风险。",
+        "无部署方式与运行环境信息（PHP 版本、SAPI），无法判断版本相关漏洞。",
+        "输入未提供 015.php 的实际代码行内容，本报告的攻击面排序基于文件规模、source/sink 热点位置与语言特征推断，属 llm_inferred 级别，需人工逐行复核后确认。"
+      ],
+      "medium_review_items": [
+        {
+          "type": "trust_boundary",
+          "file": "015.php",
+          "reason": "该脚本为无框架独立入口，需人工确认是否直接信任客户端输入（$_GET/$_POST/$_REQUEST/$_COOKIE）而未做任何白名单校验，以及是否被其他脚本 include 而继承外部信任。"
+        },
+        {
+          "type": "weak_hash",
+          "file": "015.php",
+          "reason": "单文件 PHP 脚本常出现 md5()/sha1() 用于口令或令牌校验；输入未给出代码内容，需人工确认是否使用 MD5/SHA1 等弱哈希算法。"
+        },
+        {
+          "type": "weak_random",
+          "file": "015.php",
+          "reason": "需人工确认是否使用 rand()/mt_rand()/uniqid() 生成令牌、验证码或文件名等安全敏感值，而非 random_int()/random_bytes()。"
+        },
+        {
+          "type": "insecure_cookie",
+          "file": "015.php",
+          "reason": "需人工确认是否存在 setcookie()/session_set_cookie_params() 调用且缺少 HttpOnly、Secure、SameSite 标志。"
+        },
+        {
+          "type": "weak_crypto",
+          "file": "015.php",
+          "reason": "需人工确认是否使用 mcrypt/openssl_encrypt 且算法为 DES/RC4/ECB 模式或使用固定 IV。"
+        }
+      ]
+    },
+    "finding": {
+      "enabled": true,
+      "mode": "on",
+      "tool_calls": 0,
+      "files": 1,
+      "chars": 3350,
+      "truncated_files": 0,
+      "findings": 2,
+      "duplicates": 0,
+      "rejected": [],
+      "suppressed": [],
+      "summary": "本次仅送入单个 PHP 文件 015.php（DVWA 密码修改模块，83 行），已逐行审计。发现两条可闭合链：(1) CAPTCHA 状态机绕过——step=2 仅信任客户端 passed_captcha 标志，可跳过 reCAPTCHA 直接改密（高危，链闭合）；(2) step=1 将 password_new/password_conf 未编码回显进隐藏表单，构成反射型 XSS（中危，依赖登录与 CAPTCHA 条件）。SQL 语句使用 mysqli_real_escape_string 且口令经 md5 后拼接，未发现可利用 SQL 注入；md5 用于口令哈希属 weak_hash 线索，但 DVWA 场景下不构成独立可利用链，未单独立项。未提供 php.ini/路由/认证配置，无法确认 015.php 是否强制登录及 allow_url_include 等开关；无其它文件，供应链与版本漏洞未覆盖。",
+      "gaps": [
+        "无 php.ini/Web 服务器配置，无法确认 disable_functions、open_basedir、allow_url_include",
+        "无路由/认证配置，无法确认 015.php 是否强制登录及 dvwaCurrentUser() 实现",
+        "md5 口令哈希（weak_hash）未单独立项，因缺乏独立可利用链",
+        "无 composer.json/第三方依赖，供应链风险未评估"
+      ],
+      "note": "单次 LLM 调用；请求体不含 tools/tool_choice/function calling；file_path 与行号由服务端校验，code_snippet 由真实源码回填。",
+      "rejected_count": 0,
+      "audited_files": [
+        "015.php"
+      ]
+    },
+    "policy_note": "本次档位 min_severity=low，min_confidence=0.6，抑制 0 条（suppressed_count=0，无被抑制类型）；因此本次不存在策略抑制项，但 coverage_gaps 与 human_review 中列出的未覆盖面仍属未审计范围，不能等同于未检出。"
+  },
+  "limitations": [
+    "只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。",
+    "finding 的 verdict 为 candidate 或 external，不是动态确认。",
+    "POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。",
+    "规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。",
+    "AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。"
+  ]
+}

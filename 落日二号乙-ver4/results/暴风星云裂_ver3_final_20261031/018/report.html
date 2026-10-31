@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-013917-29b728</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-013917-29b728 · 生成时间: 2026-10-30T17:40:12.774651+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\018.zip · SHA256: c4b42bf16d7ffb0d67ab50a7b701b39c7724a0451847bcfe91b4606313b9fcfd</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>3</b>findings</div>
+<div class="metric"><b>3</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次审计范围是单文件 PHP 脚本 018.php（110 行，无框架、无路由、无端点清单）。共交付 3 条去重后的 findings，全部集中在 018.php 的加密实现上：最高危的是 LLM-86c6c58e13d2（high，weak_crypto）——018.php 第 32 行附近使用 AES-128-ECB 解密会话令牌，ECB 模式无 IV、按块独立加密，可被字节翻转/块拼接伪造 admin 身份；其次是 LLM-a5c5a430e98b（medium，hardcoded_secret）——第 10 行硬编码 AES 密钥 &quot;ik ben een aardbei&quot;，密钥随源码泄露即可直接构造合法密文；SEM-1f3cfc0b6797（medium，weak_crypto）是规则侧对同一 ECB 模式的独立命中，与 high 条目同源、属同一缺陷的不同证据角度。3 条 finding 均带 POC，但需注意：weak_crypto/hardcoded_secret 的 POC 主要是静态证据 POC（密钥、算法、模式、行号），不宣称可动态复现；若要动态验证需在授权环境自行构造密文，本管线未执行。攻击面测绘指出 018.php:4 是唯一参数读取入口、sink_hot_files 为空，即注入类/XSS/路径类汇点未被规则命中，这不等于不存在，需人工逐行追踪。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>weak_crypto</code></td><td>018.php 使用 AES-128-ECB 解密会话令牌，可被字节翻转/块拼接伪造 admin 身份</td><td><code>018.php:32</code></td><td>0.85</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-medium'>medium</span></td><td><code>hardcoded_secret</code></td><td>018.php 硬编码 AES 密钥 &quot;ik ben een aardbei&quot;</td><td><code>018.php:10</code></td><td>0.85</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>018.php 使用 AES-128-ECB 弱加密模式（CWE-327）</td><td><code>018.php:3</code></td><td>0.76</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-86c6c58e13d2'><h2>F-1 018.php 使用 AES-128-ECB 解密会话令牌，可被字节翻转/块拼接伪造 admin 身份</h2><p><span class='sev sev-high'>high</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.85 · candidate / llm_inferred</p><p><b>位置：</b><code>018.php:2-32</code></p><p>018.php 第 2-8 行的 decrypt() 使用 openssl_decrypt(..., &#x27;aes-128-ecb&#x27;, $key, OPENSSL_PKCS1_PADDING) 对客户端提交的 token 解密，第 10 行硬编码密钥 &quot;ik ben een aardbei&quot;。ECB 模式对相同明文块产生相同密文块且块间无链接，攻击者无需密钥即可对密文块进行重排/拼接（block splicing），把已知 user 令牌中的 &quot;level&quot;:&quot;user&quot; 块替换为可控/已知的 &quot;level&quot;:&quot;admin&quot; 块，从而在第 32 行 $user-&gt;user==&quot;sweep&quot; &amp;&amp; $user-&gt;ex&gt;time() &amp;&amp; $user-&gt;level==&quot;admin&quot; 判断中通过，获得管理员身份。根因是弱加密模式（CWE-327），而非单纯认证逻辑缺陷。</p><p><b>影响：</b>攻击者无需密钥即可伪造管理员会话，获得 admin 权限，属于认证绕过/权限提升。</p><p><b>CVE/CWE 论证：</b>CWE-327 使用已被攻破的加密算法/模式（AES-ECB 缺乏语义安全与完整性），外部 POST 参数直接可达，无需认证，链闭合。</p><p><b>修复建议：</b>改用 AES-GCM 等带认证的加密模式，并对令牌做 HMAC 签名校验；密钥不应硬编码在源码中。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>018.php:21</code></td><td>读取攻击者提交的 token 参数</td><td>十六进制字符串</td><td></td></tr><tr><td>2</td><td><code>018.php:22</code></td><td>仅校验长度是否为 32 的倍数，不校验完整性/签名</td><td>长度合法的 hex 串</td><td>无 MAC/HMAC 校验，仅长度检查</td></tr><tr><td>3</td><td><code>018.php:25</code></td><td>hex2bin 后交给 decrypt()</td><td>原始密文字节</td><td></td></tr><tr><td>4</td><td><code>018.php:3</code></td><td>AES-128-ECB 解密，块间独立，可拼接</td><td>攻击者可控的明文块组合</td><td>ECB 无链接、无完整性保护，块可重排</td></tr><tr><td>5</td><td><code>018.php:27</code></td><td>json_decode 得到对象</td><td>JSON 对象</td><td></td></tr><tr><td>6</td><td><code>018.php:32</code></td><td>以 user/ex/level 判定管理员身份</td><td>伪造的 admin 对象通过校验</td><td>身份完全依赖可篡改的 ECB 密文</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC（weak_crypto，CWE-327）：`018.php:32` 处 `decrypt()` 使用 `openssl_decrypt($ciphertext, &#x27;aes-128-ecb&#x27;, $key, OPENSSL_PKCS1_PADDING)`，采用 ECB 模式且无 IV/无完整性校验（无 MAC、无 AEAD），同时 `OPENSSL_PKCS1_PADDING` 与 `openssl_decrypt` 的原始密文语义不匹配。ECB 对相同明文块产生相同密文块，泄露结构信息；缺少认证使密文可被篡改/拼接，配合 `json_decode` 后的 `user/level` 判定存在伪造与填充预言风险。本 POC 为离线静态证据，不发送请求。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 018.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 018.php
+- 行号: 32
+- 片段:
+```
+function decrypt ($ciphertext, $key) {
+	$e = openssl_decrypt($ciphertext, &#x27;aes-128-ecb&#x27;, $key, OPENSSL_PKCS1_PADDING);
+	if ($e === false) {
+		throw new Exception (&quot;Decryption failed&quot;);
+	}
+	return $e;
+}
+
+$key = &quot;ik ben een aardbei&quot;;
+
+$errors = &quot;&quot;;
+$success = &quot;&quot;;
+$messages = &quot;&quot;;
+
+if ($_SERVER[&#x27;REQUEST_METHOD&#x27;] == &quot;POST&quot;) {
+	try {
+		if (!array_key_exists (&#x27;token&#x27;, $_POST)) {
+			throw new Exception (&quot;No token passed&quot;);
+		} else {
+			$token = $_POST[&#x27;token&#x27;];
+			if (strlen($token) % 32 != 0) {
+				throw new Exception (&quot;Token is in wrong format&quot;);
+			} else {
+				$decrypted = decrypt(hex2bin ($token), $key);
+
+				$user = json_decode ($decrypted);
+				if ($user === null) {
+					throw new Exception (&quot;Could not decode JSON object.&quot;);
+				}
+
+				if ($user-&gt;user == &quot;sweep&quot; &amp;&amp; $user-&gt;ex &gt; time() &amp;&amp; $user-&gt;level == &quot;admin&quot;) {
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-a5c5a430e98b'><h2>F-2 018.php 硬编码 AES 密钥 &quot;ik ben een aardbei&quot;</h2><p><span class='sev sev-medium'>medium</span> <code>hardcoded_secret</code> / CWE-798 · 置信度 0.85 · candidate / llm_inferred</p><p><b>位置：</b><code>018.php:10-10</code></p><p>018.php 第 10 行将加密密钥硬编码为字符串 &quot;ik ben een aardbei&quot;，任何能读取源码或反编译部署包的人都能获得密钥，直接解密/伪造所有令牌，绕过第 32 行的身份校验。</p><p><b>影响：</b>密钥泄露导致令牌可被任意伪造，完全破坏认证。</p><p><b>CVE/CWE 论证：</b>CWE-798 硬编码凭据，外部可达且直接导致认证绕过。</p><p><b>修复建议：</b>从环境变量或密钥管理服务加载密钥，并轮换已泄露密钥。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>018.php:10</code></td><td>密钥硬编码在源码</td><td>明文密钥常量</td><td></td></tr><tr><td>2</td><td><code>018.php:3</code></td><td>decrypt 使用该密钥解密攻击者提交的 token</td><td>攻击者可用已知密钥自行加密任意明文</td><td></td></tr><tr><td>3</td><td><code>018.php:32</code></td><td>伪造的 admin 令牌通过身份校验</td><td>任意伪造身份</td><td></td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC（hardcoded_secret，CWE-798）：`018.php:10` 将 AES 密钥硬编码为字符串字面量 `$key = &quot;ik ben een aardbei&quot;;`，该密钥随后被 `decrypt()`（`018.php:2-8`）用于解密 `$_POST[&#x27;token&#x27;]` 并据此判定管理员身份（`$user-&gt;user == &quot;sweep&quot; &amp;&amp; $user-&gt;level == &quot;admin&quot;`）。任何能读取源码或反编译产物的人都能获得该密钥，从而伪造合法 token。本 POC 为离线静态证据，不发送请求、不执行任何命令。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 018.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 018.php
+- 行号: 10
+- 片段:
+```
+$key = &quot;ik ben een aardbei&quot;;
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-1f3cfc0b6797'><h2>F-3 018.php 使用 AES-128-ECB 弱加密模式（CWE-327）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.76 · candidate / rule_verified+llm</p><p><b>位置：</b><code>018.php:2-3</code></p><p>在 018.php 第 2-3 行的 decrypt($ciphertext, $key) 函数中，openssl_decrypt 的第二个参数被硬编码为 &#x27;aes-128-ecb&#x27;，即使用 AES-128 的 ECB（电子密码本）模式进行解密。ECB 模式对每个 16 字节分组独立加密/解密，不使用 IV，相同明文分组产生相同密文分组，因此不具备语义安全性。攻击者输入位置为传入 decrypt() 的 $ciphertext 参数（该函数为库函数，调用方未在片段中给出，证据不足），$key 为密钥参数。数据流为：$ciphertext → openssl_decrypt(..., &#x27;aes-128-ecb&#x27;, $key, OPENSSL_PKCS1_PADDING) → 返回明文 $e。校验无效的原因在于算法模式本身：ECB 不提供分组间扩散，且此处第四个参数使用 OPENSSL_PKCS1_PADDING（该常量用于 RSA 填充，对 openssl_decrypt 的对称解密并不适用，实际填充行为依赖 OpenSSL 默认处理），进一步削弱了完整性保护。最终危险操作是使用弱模式完成机密性/完整性保护。</p><p><b>影响：</b>使用 ECB 模式导致：1) 相同明文分组在密文中重复出现，攻击者可对结构化数据（如会话令牌、序列化对象、逐块拼接的敏感字段）进行分组重排、拼接、删除（cut-and-paste）攻击，伪造或篡改解密后的内容；2) 缺乏 IV 使加密结果确定性，可进行已知明文/选择明文比对与字典式推断；3) 若该函数用于保护认证令牌或配置密文，可能导致身份伪造或敏感数据泄露。具体业务影响取决于调用方，片段中未给出调用点，证据不足。</p><p><b>CVE/CWE 论证：</b>CWE-327（Use of a Broken or Risky Cryptographic Algorithm）：AES-128-ECB 属于不安全的加密模式，缺乏语义安全性与完整性保护。外部可达性：decrypt() 为普通 PHP 函数，若被 Web 入口调用则攻击者可通过请求参数控制 $ciphertext；但片段中未出现具体路由或 getParameter 调用，外部可达性证据不足。无需认证：取决于调用方，证据不足。利用链闭合：算法层根因明确（018.php:3 硬编码 &#x27;aes-128-ecb&#x27;），但缺少调用点与攻击者可控输入的完整链路，故仅判定为配置/实现型弱点，不宣称完整可利用链。</p><p><b>修复建议：</b>1) 改用带认证的 AEAD 模式，如 openssl_encrypt/openssl_decrypt 配合 &#x27;aes-256-gcm&#x27;，并正确生成随机 12 字节 IV（random_bytes(12)）与 16 字节认证标签，解密时校验 tag；2) 若必须使用 CBC，需使用随机 IV 并配合 HMAC-SHA256 做先加密后 MAC（encrypt-then-MAC）；3) 移除错误的 OPENSSL_PKCS1_PADDING 参数，对称解密应使用 OPENSSL_RAW_DATA 或 0，并自行做严格填充校验；4) 密钥通过 KMS/环境变量管理，禁止硬编码；5) 对历史 ECB 密文制定迁移方案（重新加密）。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>018.php:3</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC（weak_crypto，CWE-327）：`018.php:3` 为 `decrypt()` 函数体内的 `openssl_decrypt($ciphertext, &#x27;aes-128-ecb&#x27;, $key, OPENSSL_PKCS1_PADDING)` 调用点，是 ECB 弱模式在代码中的实际落点（与 `018.php:32` 为同一调用的行号视图）。该调用使用无 IV 的 ECB 模式、无认证标签，且 `OPENSSL_PKCS1_PADDING` 标志与 `openssl_decrypt` 的原始密文接口语义不符，可能导致填充处理异常或错误信息泄露。本 POC 为离线静态证据，不发送请求。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 018.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 018.php
+- 行号: 3
+- 片段:
+```
+2: function decrypt ($ciphertext, $key) {
+3: 	$e = openssl_decrypt($ciphertext, &#x27;aes-128-ecb&#x27;, $key, OPENSSL_PKCS1_PADDING);
+4: 	if ($e === false) {
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

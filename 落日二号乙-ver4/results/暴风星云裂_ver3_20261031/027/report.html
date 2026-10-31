@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-010201-95204e</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-010201-95204e · 生成时间: 2026-10-30T17:02:48.843055+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\027.zip · SHA256: 0692e8f3bcf09553285200fdbb5eecd31f5db885c7d44a68982905afded500d3</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>3</b>findings</div>
+<div class="metric"><b>3</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次审计仅覆盖单文件 PHP 脚本 027.php（约 30 行），共交付 3 条 command_injection 发现，全部为 critical 且均带 POC：LLM-c9f36281b7cf（$_REQUEST[&#x27;ip&#x27;] 拼接 shell_exec，黑名单可绕过，行 27）、GEN-2b40f95f1bb0（Windows 分支 ping 拼接，行 19）、GEN-c4599ae29817（*nix 分支 ping -c 4 拼接，行 23）。三者本质是同一处 ping 功能在不同分支/汇点上的重复呈现，最高危为 027.php 的 ping 参数直连 shell_exec 造成的未授权 RCE（若页面公网可达且无认证前置）。POC 齐全（3/3），但均为静态源码推导的 HTTP 型 POC 文本，未做动态验证。其余攻击面（路径穿越/文件包含、SQL 注入、XSS）与配置实现类（weak_hash/weak_crypto/weak_random/insecure_cookie/trust_boundary）在本次输入中无候选，属未覆盖而非已排除。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>command_injection</code></td><td>027.php ping 功能通过 $_REQUEST[&#x27;ip&#x27;] 拼接 shell_exec 导致命令注入（黑名单可绕过）</td><td><code>027.php:27</code></td><td>0.9</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-critical'>critical</span></td><td><code>command_injection</code></td><td>027.php Windows 分支 ping 命令拼接导致 OS 命令注入（CWE-78）</td><td><code>027.php:19</code></td><td>0.83</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-critical'>critical</span></td><td><code>command_injection</code></td><td>027.php *nix 分支 ping -c 4 命令拼接导致 OS 命令注入（CWE-78）</td><td><code>027.php:23</code></td><td>0.83</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-c9f36281b7cf'><h2>F-1 027.php ping 功能通过 $_REQUEST[&#x27;ip&#x27;] 拼接 shell_exec 导致命令注入（黑名单可绕过）</h2><p><span class='sev sev-critical'>critical</span> <code>command_injection</code> / CWE-78 · 置信度 0.9 · candidate / llm_inferred</p><p><b>位置：</b><code>027.php:3-27</code></p><p>027.php 在收到 POST 参数 Submit 后，从 $_REQUEST[&#x27;ip&#x27;] 读取用户输入 $target（第 5 行），仅用 str_replace 删除 &#x27;&amp;&amp;&#x27; 与 &#x27;;&#x27; 两个子串（第 8-14 行）作为黑名单，随后直接把 $target 拼接到 shell_exec(&#x27;ping -c 4 &#x27; . $target)（*nix，第 23 行）或 shell_exec(&#x27;ping &#x27; . $target)（Windows，第 19 行）执行。黑名单只过滤 &#x27;&amp;&amp;&#x27; 和 &#x27;;&#x27;，未过滤管道符 &#x27;|&#x27;、后台执行 &#x27;&amp;&#x27;、命令替换反引号、$()、换行等 shell 元字符，也未使用 escapeshellarg/escapeshellcmd，因此攻击者可在 ip 参数中注入任意系统命令，实现远程命令执行。</p><p><b>影响：</b>未认证远程攻击者可在服务器上以 Web 服务进程权限执行任意系统命令，读取敏感文件、横向移动、植入后门，完全控制主机。</p><p><b>CVE/CWE 论证：</b>CWE-78 OS 命令注入。外部 HTTP 参数 ip 直接拼接进 shell_exec，黑名单仅过滤 &#x27;&amp;&amp;&#x27; 与 &#x27;;&#x27;，可用 &#x27;|&#x27; 等元字符绕过，source→sink 链在 CODE PACK 内完整闭合，无需认证。</p><p><b>修复建议：</b>不要将用户输入拼接进 shell 命令；改用 escapeshellarg($target) 对参数整体转义，或使用白名单校验 IP 格式（filter_var($target, FILTER_VALIDATE_IP)），并避免使用 shell_exec 执行外部命令。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>027.php:3</code></td><td>检查 POST 参数 Submit 是否存在，作为进入处理逻辑的开关</td><td>请求进入分支</td><td></td></tr><tr><td>2</td><td><code>027.php:5</code></td><td>从 $_REQUEST[&#x27;ip&#x27;] 读取攻击者可控输入并赋给 $target</td><td>$target = 攻击者原始字符串</td><td>$_REQUEST 同时接受 GET/POST/Cookie，无类型或白名单校验</td></tr><tr><td>3</td><td><code>027.php:8-14</code></td><td>用 str_replace 删除 &#x27;&amp;&amp;&#x27; 与 &#x27;;&#x27; 两个子串</td><td>$target 中 &#x27;&amp;&amp;&#x27; 与 &#x27;;&#x27; 被移除，其余字符原样保留</td><td>黑名单仅覆盖 &#x27;&amp;&amp;&#x27; 与 &#x27;;&#x27;，未过滤 &#x27;|&#x27;、&#x27;&amp;&#x27;、&#x27;`&#x27;、&#x27;$()&#x27;、换行等 shell 元字符，可用管道符或命令替换绕过</td></tr><tr><td>4</td><td><code>027.php:23</code></td><td>将未净化的 $target 拼接到 ping 命令并交给 shell_exec 执行</td><td>&#x27;ping -c 4 &#x27; + $target 作为 shell 命令字符串执行</td><td>未使用 escapeshellarg/escapeshellcmd，shell 会解释注入的元字符</td></tr><tr><td>5</td><td><code>027.php:27</code></td><td>命令输出回显到页面 &lt;pre&gt; 中，攻击者可直接读取执行结果</td><td>$cmd 为命令 stdout，拼入 $html 输出</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /027.php（POST）的 OS 命令注入 POC。注入点：POST 参数 ip；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/027.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 OS 命令注入 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/027.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;ip=%3Bid&#x27;</pre><div class='muted'>预期：响应出现命令回显（如 uid=、whoami 输出），或带外通道收到请求。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/027.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;ip=%3Bid&#x27;
+</pre><h4>request.http</h4><pre>POST /027.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 8
+
+ip=%3Bid
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='GEN-2b40f95f1bb0'><h2>F-2 027.php Windows 分支 ping 命令拼接导致 OS 命令注入（CWE-78）</h2><p><span class='sev sev-critical'>critical</span> <code>command_injection</code> / CWE-78 · 置信度 0.83 · candidate / rule_verified+llm</p><p><b>位置：</b><code>027.php:17-19</code></p><p>攻击者通过 HTTP query 参数 `ip` 提供输入，027.php:5 将其读入 `$target`；027.php:17 用 `stristr(php_uname(&#x27;s&#x27;),&#x27;Windows NT&#x27;)` 判断运行平台，命中 Windows 分支后，027.php:19 执行 `$cmd = shell_exec( &#x27;ping  &#x27; . $target );`，把 `$target` 直接字符串拼接到 shell 命令中。代码未对 `$target` 做任何白名单校验、转义（如 escapeshellarg）或参数化，因此 `ip` 中的 shell 元字符（`&amp;`、`|`、`;`、`&amp;&amp;` 等）会被 shell 解释，形成命令注入。该分支仅在 Windows 主机上触发，属于平台相关但外部可达的注入点。</p><p><b>影响：</b>远程未认证攻击者可在 Web 服务进程权限下执行任意系统命令，导致服务器完全失陷（RCE）、敏感文件读取、内网横向移动与持久化。</p><p><b>CVE/CWE 论证：</b>CWE-78（OS Command Injection）。外部可达性：注入点位于 HTTP query 参数 `ip`，无需认证即可访问；利用链闭合：`ip` → `$target`（027.php:5）→ `shell_exec(&#x27;ping  &#x27; . $target)`（027.php:19），中间无有效净化；触发条件为 Windows 平台（027.php:17 分支），在目标为 Windows 时无需额外前置条件。</p><p><b>修复建议：</b>不要用字符串拼接构造 shell 命令：改用参数数组形式（如 `proc_open`/`exec` 传入参数数组）或 PHP 的 `escapeshellarg($target)`/`escapeshellcmd` 组合；同时对 `ip` 做严格白名单校验（仅允许 IPv4/IPv6 字面量，如 `filter_var($target, FILTER_VALIDATE_IP)`），拒绝含空白与 shell 元字符的输入；以最小权限账户运行 Web 服务。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>027.php:5</code></td><td>从 query `ip` 读取外部输入</td><td>污点进入 target</td><td></td></tr><tr><td>2</td><td><code>027.php:19</code></td><td>危险汇点：$cmd = shell_exec( &#x27;ping  &#x27; . $target );</td><td>污点进入 command_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /027（ANY）的 OS 命令注入 POC。注入点：ANY 参数 ip；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/027&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 OS 命令注入 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/027?ip=%3Bid&#x27;</pre><div class='muted'>预期：响应出现命令回显（如 uid=、whoami 输出），或带外通道收到请求。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/027?ip=%3Bid&#x27;
+</pre><h4>request.http</h4><pre>ANY /027 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 8
+
+ip=%3Bid
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='GEN-c4599ae29817'><h2>F-3 027.php *nix 分支 ping -c 4 命令拼接导致 OS 命令注入（CWE-78）</h2><p><span class='sev sev-critical'>critical</span> <code>command_injection</code> / CWE-78 · 置信度 0.83 · candidate / rule_verified+llm</p><p><b>位置：</b><code>027.php:21-23</code></p><p>攻击者通过 HTTP query 参数 `ip` 提供输入，027.php:5 将其读入 `$target`；当 027.php:17 的平台判断不成立（非 Windows，即 *nix 分支）时，027.php:23 执行 `$cmd = shell_exec( &#x27;ping  -c 4 &#x27; . $target );`，把 `$target` 直接拼接到 shell 命令。代码未对 `$target` 做白名单校验或 `escapeshellarg` 转义，`ip` 中的 `;`、`|`、`&amp;&amp;`、`$()`、反引号等元字符会被 shell 解释，构成命令注入。该分支在 Linux/Unix 主机上默认触发，是主要利用路径。</p><p><b>影响：</b>远程未认证攻击者可在 Web 服务进程权限下执行任意系统命令，实现 RCE、读取任意文件、窃取凭据、建立持久化后门，并可作为内网跳板。</p><p><b>CVE/CWE 论证：</b>CWE-78（OS Command Injection）。外部可达性：注入点为 HTTP query 参数 `ip`，无需认证；利用链闭合：`ip` → `$target`（027.php:5）→ `shell_exec(&#x27;ping  -c 4 &#x27; . $target)`（027.php:23），无有效净化；在 *nix 平台（027.php:21 分支）默认可达，无需额外前置条件。</p><p><b>修复建议：</b>改用参数数组方式执行外部程序（`proc_open`/`exec` 传数组，避免经 shell 解析）；若必须拼接，使用 `escapeshellarg($target)`；并对 `ip` 做严格白名单（`filter_var($target, FILTER_VALIDATE_IP)` 仅接受合法 IP 字面量），拒绝空白与 shell 元字符；以最小权限运行服务并限制出站命令执行能力。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>027.php:5</code></td><td>从 query `ip` 读取外部输入</td><td>污点进入 target</td><td></td></tr><tr><td>2</td><td><code>027.php:23</code></td><td>危险汇点：$cmd = shell_exec( &#x27;ping  -c 4 &#x27; . $target );</td><td>污点进入 command_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /027（ANY）的 OS 命令注入 POC。注入点：ANY 参数 ip；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/027&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 OS 命令注入 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/027?ip=%3Bid&#x27;</pre><div class='muted'>预期：响应出现命令回显（如 uid=、whoami 输出），或带外通道收到请求。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/027?ip=%3Bid&#x27;
+</pre><h4>request.http</h4><pre>ANY /027 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 8
+
+ip=%3Bid
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

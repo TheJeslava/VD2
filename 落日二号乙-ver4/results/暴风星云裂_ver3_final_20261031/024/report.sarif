@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/csrf",
+              "name": "跨站请求伪造",
+              "shortDescription": {
+                "text": "跨站请求伪造（CWE-352）"
+              },
+              "fullDescription": {
+                "text": "跨站请求伪造"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/352.html",
+              "properties": {
+                "tags": [
+                  "csrf",
+                  "CWE-352",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/brute_force",
+              "name": "暴力破解防护缺失",
+              "shortDescription": {
+                "text": "暴力破解防护缺失（CWE-307）"
+              },
+              "fullDescription": {
+                "text": "暴力破解防护缺失"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/307.html",
+              "properties": {
+                "tags": [
+                  "brute_force",
+                  "CWE-307",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/weak_crypto",
+              "name": "弱加密算法",
+              "shortDescription": {
+                "text": "弱加密算法（CWE-327）"
+              },
+              "fullDescription": {
+                "text": "弱加密算法"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/327.html",
+              "properties": {
+                "tags": [
+                  "weak_crypto",
+                  "CWE-327",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T17:41:18.361371+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "024.php 密码修改处 SQL 注入（CWE-89）\n\n攻击者通过 GET 参数 password_new（024.php:7 `$pass_new = $_GET['password_new'];`）提交输入。该值在 024.php:13 仅经过 mysqli_real_escape_string 转义，随后在 024.php:14 被 md5() 处理，再于 024.php:18 直接拼接进 UPDATE 语句：`$insert = \"UPDATE `users` SET password = '$pass_new' WHERE user = '\" . $current_user . \"';\";`，最终在 024.php:19 交给 mysqli_query 执行。校验无效的原因：代码没有使用参数化查询或预处理语句，而是字符串拼接；虽然 mysqli_real_escape_string 能转义引号，但该转义发生在 md5() 之前，md5 会把转义后的字符串整体哈希为 32 位十六进制串，因此 password_new 实际进入 SQL 的是哈希值，注入面被 md5 削弱；真正未受控的是 $current_user（dvwaCurrentUser() 的返回值，024.php:17）被直接拼进 user 条件。若该值可被外部影响（如会话/用户名来源），则构成注入通道。当前证据显示 password_new 路径因 md5 前置而难以直接闭合注入，需结合 dvwaCurrentUser 的实现确认。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 17,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-cf38b1a2cb95"
+          },
+          "properties": {
+            "finding_id": "GEN-cf38b1a2cb95",
+            "confidence": 0.55,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-89",
+            "endpoint": "/024",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/csrf",
+          "level": "error",
+          "message": {
+            "text": "DVWA 密码修改功能仅依赖 HTTP_REFERER 校验，可被 CSRF 绕过实现账户接管\n\n024.php 的密码修改逻辑在 024.php:3 通过 `$_GET['Change']` 触发，在 024.php:5 仅用 `stripos($_SERVER['HTTP_REFERER'], $_SERVER['SERVER_NAME']) !== false` 判断请求来源。HTTP_REFERER 完全由客户端控制，攻击者可在自己的页面中把 Referer 伪造成包含目标域名的字符串（例如 `http://TARGET/` 或 `http://evil.com/?TARGET`），从而通过该“防护”。通过后 024.php:7-8 直接读取 `password_new`/`password_conf`，024.php:11 仅比较两者相等，024.php:14 做 md5，024.php:18 拼接 UPDATE 语句，024.php:19 执行更新当前用户密码。整个流程没有任何 CSRF token、没有要求提交旧密码、没有二次确认，攻击者诱导已登录受害者访问恶意页面即可把受害者密码改成攻击者已知值，实现账户接管。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-3eef1cf779fd"
+          },
+          "properties": {
+            "finding_id": "LLM-3eef1cf779fd",
+            "confidence": 0.87,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-352",
+            "endpoint": "/024.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/brute_force",
+          "level": "error",
+          "message": {
+            "text": "024.php 口令修改缺少暴力破解防护（CWE-307）\n\n024.php:6-8 直接读取 $_GET['password_new'] 与 $_GET['password_conf'] 并进入修改流程，代码中未见失败计数、账户锁定、验证码或速率限制逻辑。候选将其标注为暴力破解防护缺失。但需注意：该页面为口令修改而非登录认证，且当前片段未展示任何口令校验/比对逻辑，因此“可被暴力破解”的论证依赖跨文件（登录入口）与运行时行为，现有证据不足以确认攻击者可在此端点反复猜测并获知成功与否。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 6,
+                  "endLine": 7
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-72b85cc24676"
+          },
+          "properties": {
+            "finding_id": "SEM-72b85cc24676",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-307",
+            "endpoint": "/024",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/weak_crypto",
+          "level": "warning",
+          "message": {
+            "text": "024.php 使用 MD5 存储口令（CWE-328 弱哈希）\n\n024.php:14 `$pass_new = md5( $pass_new );` 对用户新口令直接做单次 MD5 后写入 users 表（024.php:18-19 的 UPDATE）。MD5 为快速、无盐、无迭代的哈希，抗碰撞与抗暴力能力不足，且此处未见盐值或慢哈希（bcrypt/argon2/PBKDF2）替代。该弱点属实现型，无需 HTTP 污点链即可成立，证据为源码中明确的 md5( 调用。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 13,
+                  "endLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-23ce27f2da1c"
+          },
+          "properties": {
+            "finding_id": "SEM-23ce27f2da1c",
+            "confidence": 0.8,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-327",
+            "endpoint": "/024",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

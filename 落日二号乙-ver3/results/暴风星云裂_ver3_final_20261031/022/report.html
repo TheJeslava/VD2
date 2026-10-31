@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-014008-84a8b0</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-014008-84a8b0 · 生成时间: 2026-10-30T17:40:51.787339+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\022.zip · SHA256: c1663891c5c6246a5a3ae32f77dbdd64dbfc5609548a3320760271ea88e17c1b</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>2</b>findings</div>
+<div class="metric"><b>2</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总基于单文件 PHP 脚本 022.php（69 行）的源码审计结果，共交付 2 条 findings，均带 POC。最高危为 022.php 第 44 行附近的修改密码功能 SQL 注入（CWE-89，critical，rule 来源），污点从请求参数直接流入 SQL 语句，单文件内路径极短；另一条为 022.php 第 39 行附近使用 MD5 存储口令（CWE-328 弱哈希，medium）。需注意：该条被归类为 weak_crypto，但按类型规范 MD5/SHA1 应归 weak_hash（CWE-328），建议在交付时校正类型标签。POC 齐全度为 2/2，但其中 SQL 注入为 HTTP 型 POC（目标以 TARGET 占位，仅限授权测试），弱哈希条目仅有静态证据 POC，不能宣称可动态复现。本次无二次注入链、无被隔离文件、无 prompt_injection 诱导文本。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>022.php 修改密码功能 SQL 注入（CWE-89）</td><td><code>022.php:44</code></td><td>0.55</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>022.php 使用 MD5 存储口令（CWE-328 弱哈希）</td><td><code>022.php:39</code></td><td>0.8</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-e38e01cf9ba5'><h2>F-1 022.php 修改密码功能 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.55 · candidate / rule_verified+llm</p><p><b>位置：</b><code>022.php:42-44</code></p><p>攻击者通过 HTTP 请求向 022.php 提交修改密码表单，其中 password_new 参数（022.php:25 读取）进入 $pass_new。代码在 022.php:38 仅用 mysqli_real_escape_string 对 $pass_new 做转义，随后在 022.php:39 执行 $pass_new = md5($pass_new)，把转义后的字符串整体哈希成 32 位十六进制串。哈希结果只含 [0-9a-f]，因此后续拼接进 SQL 时不再携带任何引号或元字符，单看 $pass_new 这一路，转义加哈希实际上阻断了注入。真正的注入点在 022.php:43 的拼接语句：$insert = &quot;UPDATE `users` SET password = &#x27;&quot; . $pass_new . &quot;&#x27; WHERE user = &#x27;&quot; . $current_user . &quot;&#x27;;&quot;; 其中 $current_user 由 022.php:42 的 dvwaCurrentUser() 取得，直接以字符串拼接方式进入 SQL，未做参数化或转义，最终在 022.php:44 由 mysqli_query 执行。若 dvwaCurrentUser() 的返回值可被攻击者影响（例如来源于会话中可写字段、Cookie 或请求头映射的用户名），则可在 user 条件处闭合引号注入任意 SQL。需要说明：本次输入未提供 dvwaCurrentUser() 的实现，该函数的可控性证据不足，因此该链的闭合性属于推断而非已验证。</p><p><b>影响：</b>若 $current_user 可控，攻击者可构造 user 条件注入，篡改 users 表中任意账号（含 admin）的 password 字段，实现账号接管与越权登录；也可借助 UPDATE 语句的布尔/时间盲注逐位读取数据库内容（如其他用户口令哈希、会话数据），造成敏感数据泄露。由于该语句本身是 UPDATE，注入还可扩展为堆叠或多条件更新，破坏数据完整性。</p><p><b>CVE/CWE 论证：</b>CWE-89：SQL 语句由字符串拼接构造（022.php:43），外部可控数据（$current_user，经 dvwaCurrentUser()）未经参数化即进入 mysqli_query（022.php:44）。外部可达性：022.php 为 DVWA 的 Web 端点，修改密码表单无需额外权限即可提交，属远程可达；无需认证的前提取决于部署配置（DVWA 默认需登录，低安全级别下会话即可触达），因此“无需认证”应表述为“在已获得普通会话的前提下无需更高权限”。利用链闭合性：source（请求参数/会话用户标识）→ $current_user → 字符串拼接 → mysqli_query 的路径在源码中成立，但 dvwaCurrentUser() 的具体数据来源未在证据中给出，闭合性为 llm_inferred。</p><p><b>修复建议：</b>1) 将 022.php:43-44 改为预处理语句：$stmt = $GLOBALS[&quot;___mysqli_ston&quot;]-&gt;prepare(&quot;UPDATE `users` SET password = ? WHERE user = ?&quot;); $stmt-&gt;bind_param(&#x27;ss&#x27;, $pass_new, $current_user); $stmt-&gt;execute(); 彻底消除拼接。2) 对 $current_user 做服务端白名单校验（仅允许已认证会话绑定的用户名），不要从请求可控字段推导当前用户。3) 保留 mysqli_real_escape_string 仅作为纵深防御，不作为主要防护。4) 数据库账号遵循最小权限，仅授予 users 表必要列的 UPDATE 权限。5) 修改密码操作增加 CSRF token 与旧密码校验。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>022.php:25</code></td><td>从 query `password_new` 读取外部输入</td><td>污点进入 insert</td><td></td></tr><tr><td>2</td><td><code>022.php:44</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;],  $insert );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /022（ANY）的 SQL 注入 POC。注入点：ANY 参数 password_new；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/022&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/022?password_new=%27%20OR%20%271%27%3D%271&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/022?password_new=%27%20OR%20%271%27%3D%271&#x27;
+</pre><h4>request.http</h4><pre>ANY /022 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 38
+
+password_new=%27%20OR%20%271%27%3D%271
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-f7415d28d8c9'><h2>F-2 022.php 使用 MD5 存储口令（CWE-328 弱哈希）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.8 · candidate / rule_verified+llm</p><p><b>位置：</b><code>022.php:38-39</code></p><p>022.php:38 先用 mysqli_real_escape_string 处理 $pass_new，随后 022.php:39 执行 $pass_new = md5( $pass_new );，把用户新口令以无盐 MD5 单轮哈希形式写入数据库（022.php:43 的 UPDATE 语句将 password 列设为该哈希值）。MD5 属于已破译的快速哈希算法，存在已知碰撞攻击，且对高速 GPU 暴力破解与彩虹表几乎无抵抗力；此处未使用盐值、未使用慢哈希（bcrypt/scrypt/Argon2），保护对象是用户登录口令这一安全敏感数据。该弱点为配置/实现型，不依赖 HTTP 污点链，证据即 022.php:39 的 md5( 调用原文。</p><p><b>影响：</b>数据库一旦泄露（如通过同文件 GEN-e38e01cf9ba5 的 SQL 注入读取 users 表），攻击者可用彩虹表或 GPU 集群在极短时间内还原大量用户明文口令，进而横向登录其他系统；相同口令产生相同哈希，也便于批量撞库与用户画像关联。</p><p><b>CVE/CWE 论证：</b>CWE-328（Use of Weak Hash）：MD5 用于口令存储，属安全用途的弱哈希，而非 CWE-327 的加密算法误用。外部可达性：口令哈希在用户注册/改密时生成并持久化，攻击者通过数据库泄露或注入读取即可离线攻击，无需在线交互；无需认证即可对已获取的哈希进行离线破解。利用链闭合性：022.php:39 的 md5() 调用与 022.php:43 的写入路径在源码中直接可见，闭合性成立；实际破解难度取决于口令强度，属推断。</p><p><b>修复建议：</b>1) 改用 password_hash($pass_new, PASSWORD_DEFAULT)（bcrypt/Argon2id）生成带盐慢哈希，校验用 password_verify。2) 迁移期可对存量 MD5 哈希在用户下次登录成功后透明重哈希升级。3) 强制口令复杂度与长度下限，禁止常见弱口令。4) 数据库连接与备份加密，限制 users 表读取权限，降低哈希外泄面。5) 结合 GEN-e38e01cf9ba5 的修复，阻断通过注入批量导出哈希的路径。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>022.php:39</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC：022.php:39 使用 md5() 对密码 $pass_new 做哈希。MD5 属弱哈希算法（CWE-328），不应用于口令存储。本项为配置/代码型候选，无 HTTP 污点，无需发送请求。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 022.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 022.php
+- 行号: 39
+- 片段:
+```
+38: 		$pass_new = mysqli_real_escape_string ($GLOBALS[&quot;___mysqli_ston&quot;], $pass_new);
+39: 		$pass_new = md5( $pass_new );
+40: 
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261030-224558-657ffe</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261030-224558-657ffe · 生成时间: 2026-10-30T14:46:32.913096+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\008.zip · SHA256: dfae4e0605b1c5ffe8c4a8291c00c73ea277b830eed60f0489dfec01c43f36a6</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：LLM-be8d58eeb7fa，类型 idor（BAC/IDOR），严重度 high，位于 008.php 第 47 行附近，判定依据为可篡改的 user_id Cookie 被用于查询任意用户资料，已附带 POC（HTTP 型，可动态复现，仅限授权测试）。这是本次唯一交付项，也是最高危项。POC 齐全度：1/1 已具备。需强调：本次仅 1 个 PHP 文件进入 code_pack，无路由/端点清单、无服务器配置、无依赖清单，008.php 第 6 行 sink 与第 12 行 source 的具体函数与数据流未在输入中给出代码片段，因此注入类（command/sql/path/ssrf）与配置类（weak_hash/weak_random/weak_crypto/insecure_cookie/trust_boundary）均属未覆盖，不能据此断言不存在。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>idor</code></td><td>DVWA 008.php 通过可篡改 user_id Cookie 实现越权访问任意用户资料（BAC/IDOR）</td><td><code>008.php:47</code></td><td>0.88</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='LLM-be8d58eeb7fa'><h2>F-1 DVWA 008.php 通过可篡改 user_id Cookie 实现越权访问任意用户资料（BAC/IDOR）</h2><p><span class='sev sev-high'>high</span> <code>idor</code> / CWE-639 · 置信度 0.88 · candidate / llm_inferred</p><p><b>位置：</b><code>008.php:30-47</code></p><p>008.php 第 15-19 行从 $_GET[&#x27;user_id&#x27;] 读取目标用户 ID，仅用 preg_match(&#x27;/^\d+$/&#x27;) 校验为纯数字后 intval 转换；第 30-33 行从客户端 Cookie $_COOKIE[&#x27;user_id&#x27;] 读取“当前用户身份”，仅比较 $id == $cookie_id 即授予访问权限。Cookie 完全由攻击者控制，攻击者只需将 Cookie user_id 设置为任意目标用户 ID，同时 GET 参数 user_id 设为同一值，即可绕过归属校验，读取任意用户的 first_name/last_name/avatar（第 35-47 行）。服务端未使用会话中的真实身份（第 7-11 行查出的 $current_user_id/$role 在授权判断中完全未被使用），属于典型的信任客户端 Cookie 的访问控制缺陷。</p><p><b>影响：</b>任意已登录用户可越权读取其他用户（含管理员）的姓名、头像等资料，破坏访问控制边界，可结合枚举遍历全部用户。</p><p><b>CVE/CWE 论证：</b>CWE-639 授权绕过（IDOR）。外部 HTTP 可达，无需高权限，仅需可控 Cookie；source→sink 链在 CODE PACK 内完整闭合（008.php:15→30→33→35→47）。</p><p><b>修复建议：</b>授权判断必须使用服务端会话中的真实用户身份（如第 7-11 行查出的 $current_user_id），禁止信任客户端 Cookie 中的 user_id；对目标资源做归属校验。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>008.php:15</code></td><td>读取 GET 参数 action 与 user_id，进入越权分支</td><td>外部可控字符串</td><td></td></tr><tr><td>2</td><td><code>008.php:16</code></td><td>preg_match 仅校验 user_id 为纯数字，不校验归属</td><td>数字字符串，通过格式校验</td><td></td></tr><tr><td>3</td><td><code>008.php:19</code></td><td>intval 转换为整数 $id</td><td>整数目标用户 ID</td><td></td></tr><tr><td>4</td><td><code>008.php:30</code></td><td>从客户端 Cookie 读取 user_id 作为“当前身份”</td><td>攻击者可控整数 $cookie_id</td><td></td></tr><tr><td>5</td><td><code>008.php:33</code></td><td>$id == $cookie_id 比较，攻击者令两者相等即通过</td><td>条件恒真（攻击者控制）</td><td>归属校验基于客户端 Cookie，而非服务端会话身份；第 7-11 行查出的真实 $current_user_id 未被使用</td></tr><tr><td>6</td><td><code>008.php:35</code></td><td>以 $id 查询目标用户资料并渲染输出</td><td>任意用户资料被读取</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /008.php（GET）的 越权 / IDOR POC。注入点：Cookie: user_id；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/008.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 越权 / IDOR 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/008.php&#x27; \
+  -H &#x27;Cookie: user_id=2&#x27;</pre><div class='muted'>预期：使用其他对象 ID 返回他人数据或执行他人操作。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/008.php&#x27; \
+  -H &#x27;Cookie: user_id=2&#x27;
+</pre><h4>request.http</h4><pre>GET /008.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Cookie: user_id=2
+
+
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

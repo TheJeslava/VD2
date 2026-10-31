@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/weak_crypto",
+              "name": "弱加密算法",
+              "shortDescription": {
+                "text": "弱加密算法（CWE-327）"
+              },
+              "fullDescription": {
+                "text": "弱加密算法"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/327.html",
+              "properties": {
+                "tags": [
+                  "weak_crypto",
+                  "CWE-327",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T17:40:51.787339+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "022.php 修改密码功能 SQL 注入（CWE-89）\n\n攻击者通过 HTTP 请求向 022.php 提交修改密码表单，其中 password_new 参数（022.php:25 读取）进入 $pass_new。代码在 022.php:38 仅用 mysqli_real_escape_string 对 $pass_new 做转义，随后在 022.php:39 执行 $pass_new = md5($pass_new)，把转义后的字符串整体哈希成 32 位十六进制串。哈希结果只含 [0-9a-f]，因此后续拼接进 SQL 时不再携带任何引号或元字符，单看 $pass_new 这一路，转义加哈希实际上阻断了注入。真正的注入点在 022.php:43 的拼接语句：$insert = \"UPDATE `users` SET password = '\" . $pass_new . \"' WHERE user = '\" . $current_user . \"';\"; 其中 $current_user 由 022.php:42 的 dvwaCurrentUser() 取得，直接以字符串拼接方式进入 SQL，未做参数化或转义，最终在 022.php:44 由 mysqli_query 执行。若 dvwaCurrentUser() 的返回值可被攻击者影响（例如来源于会话中可写字段、Cookie 或请求头映射的用户名），则可在 user 条件处闭合引号注入任意 SQL。需要说明：本次输入未提供 dvwaCurrentUser() 的实现，该函数的可控性证据不足，因此该链的闭合性属于推断而非已验证。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "022.php"
+                },
+                "region": {
+                  "startLine": 42,
+                  "endLine": 44
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-e38e01cf9ba5"
+          },
+          "properties": {
+            "finding_id": "GEN-e38e01cf9ba5",
+            "confidence": 0.55,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-89",
+            "endpoint": "/022",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/weak_crypto",
+          "level": "warning",
+          "message": {
+            "text": "022.php 使用 MD5 存储口令（CWE-328 弱哈希）\n\n022.php:38 先用 mysqli_real_escape_string 处理 $pass_new，随后 022.php:39 执行 $pass_new = md5( $pass_new );，把用户新口令以无盐 MD5 单轮哈希形式写入数据库（022.php:43 的 UPDATE 语句将 password 列设为该哈希值）。MD5 属于已破译的快速哈希算法，存在已知碰撞攻击，且对高速 GPU 暴力破解与彩虹表几乎无抵抗力；此处未使用盐值、未使用慢哈希（bcrypt/scrypt/Argon2），保护对象是用户登录口令这一安全敏感数据。该弱点为配置/实现型，不依赖 HTTP 污点链，证据即 022.php:39 的 md5( 调用原文。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "022.php"
+                },
+                "region": {
+                  "startLine": 38,
+                  "endLine": 39
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-f7415d28d8c9"
+          },
+          "properties": {
+            "finding_id": "SEM-f7415d28d8c9",
+            "confidence": 0.8,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-327",
+            "endpoint": "/022",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/path_traversal",
+              "name": "路径穿越 / 任意文件读写",
+              "shortDescription": {
+                "text": "路径穿越 / 任意文件读写（CWE-22）"
+              },
+              "fullDescription": {
+                "text": "外部输入控制文件路径，可越出预期目录读取、写入或删除文件。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/22.html",
+              "properties": {
+                "tags": [
+                  "path_traversal",
+                  "CWE-22",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/xss",
+              "name": "跨站脚本",
+              "shortDescription": {
+                "text": "跨站脚本（CWE-79）"
+              },
+              "fullDescription": {
+                "text": "外部输入未编码进入 HTML/JS 上下文，可在受害者浏览器执行脚本。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html",
+              "properties": {
+                "tags": [
+                  "xss",
+                  "CWE-79",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T12:54:54.657295+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "SQL 注入（low 档）：vulnerabilities/sqli/source/low.php 将 $_REQUEST['id'] 直接拼接进 SELECT 查询\n\nsqli 模块 low 安全等级下，index.php 引入 source/low.php；low.php 第 5 行从 $_REQUEST['id'] 取值，第 10 行直接以字符串插值方式拼入 \"SELECT first_name, last_name FROM users WHERE user_id = '$id';\"，第 11 行交给 mysqli_query 执行。全程无 mysqli_real_escape_string、无类型强转、无预处理语句，攻击者可通过单引号闭合字符串并注入任意 SQL（UNION 联合查询、布尔/时间盲注），读取 users 表全部字段（含 password 哈希）乃至 information_schema 中的库表结构。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vulnerabilities/sqli/source/low.php"
+                },
+                "region": {
+                  "startLine": 5,
+                  "endLine": 11
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-7315873b3f4e"
+          },
+          "properties": {
+            "finding_id": "LLM-7315873b3f4e",
+            "confidence": 0.9,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-89",
+            "endpoint": "/vulnerabilities/sqli/",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/path_traversal",
+          "level": "error",
+          "message": {
+            "text": "view_help.php 通过 id/locale 参数拼接路径并 eval 文件内容，导致任意文件读取与代码执行\n\nview_help.php 第 14-16 行从 $_GET 读取 id、security、locale，第 20/22 行将 id 与 locale 直接拼入 file_get_contents 路径 \"vulnerabilities/{$id}/help/help.php\" 或 \"help.{$locale}.php\"，随后对读到的内容执行 eval。id/locale 未做 basename、白名单或路径规范化，攻击者可用 ../ 穿越读取任意文件；若目标文件内容可控（如上传文件或日志），eval 将导致远程代码执行。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vulnerabilities/view_help.php"
+                },
+                "region": {
+                  "startLine": 14,
+                  "endLine": 23
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-402587808170"
+          },
+          "properties": {
+            "finding_id": "LLM-402587808170",
+            "confidence": 0.85,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-22",
+            "endpoint": "/vulnerabilities/view_help.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "二次 SQL 注入：session-input.php 写入 $_SESSION['id']，sqli 模块读取后拼入查询\n\nsession-input.php 第 12 行将 $_POST['id'] 原样写入 $_SESSION['id']（存储写点），无任何过滤；sqli 模块在 low 档从会话中取出该值（存储读点）并拼入 SQL 查询（危险汇点）。攻击者先通过 session-input.php 存入恶意载荷，再访问 sqli 模块触发注入，绕过仅针对单次请求参数的检查。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vulnerabilities/sqli/session-input.php"
+                },
+                "region": {
+                  "startLine": 11,
+                  "endLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-fb23f3d9c630"
+          },
+          "properties": {
+            "finding_id": "LLM-fb23f3d9c630",
+            "confidence": 0.62,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-89",
+            "endpoint": "/vulnerabilities/sqli/session-input.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/xss",
+          "level": "warning",
+          "message": {
+            "text": "session-input.php 将 $_POST['id'] 未编码回显到页面（反射型 XSS）\n\nsession-input.php 第 14 行将 $_SESSION['id']（源自 $_POST['id']）直接拼入 $page['body'] 输出，未做 htmlspecialchars 编码，攻击者可注入脚本在受害者浏览器执行，窃取会话或执行敏感操作。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vulnerabilities/sqli/session-input.php"
+                },
+                "region": {
+                  "startLine": 12,
+                  "endLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-13fca7fffff3"
+          },
+          "properties": {
+            "finding_id": "LLM-13fca7fffff3",
+            "confidence": 0.8,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-79",
+            "endpoint": "/vulnerabilities/sqli/session-input.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/path_traversal",
+          "level": "warning",
+          "message": {
+            "text": "view_source_all.php 通过 id 参数拼接路径读取源码文件\n\nview_source_all.php 第 12 行读取 $_GET['id']，第 14/18/22/26 行将其拼入 \"./{$id}/source/low.php\" 等路径并 file_get_contents 读取，未做 basename 或白名单校验，攻击者可穿越目录读取任意 .php 文件内容（经 highlight_string 回显）。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vulnerabilities/view_source_all.php"
+                },
+                "region": {
+                  "startLine": 11,
+                  "endLine": 28
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-86bd7b14c357"
+          },
+          "properties": {
+            "finding_id": "LLM-86bd7b14c357",
+            "confidence": 0.8,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-22",
+            "endpoint": "/vulnerabilities/view_source_all.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        }
+      ]
+    }
+  ]
+}

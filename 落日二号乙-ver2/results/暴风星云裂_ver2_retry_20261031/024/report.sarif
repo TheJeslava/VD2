@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/business_logic",
+              "name": "业务逻辑漏洞",
+              "shortDescription": {
+                "text": "业务逻辑漏洞（CWE-840）"
+              },
+              "fullDescription": {
+                "text": "业务流程/状态机缺陷导致越权、绕过付费、重复领取等。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/840.html",
+              "properties": {
+                "tags": [
+                  "business_logic",
+                  "CWE-840",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T16:21:38.646088+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "024.php 密码修改功能 SQL 注入（CWE-89）\n\n攻击者通过修改密码表单提交新口令，该值在 024.php:8 被读取为 `password_conf`（源码片段中对应变量 `$pass_new`），随后在 024.php:18 被直接字符串拼接进 UPDATE 语句：`$insert = \"UPDATE `users` SET password = '$pass_new' WHERE user = '\" . $current_user . \"';\"`，未做任何转义或参数化。024.php:19 通过 `mysqli_query($GLOBALS[\"___mysqli_ston\"], $insert)` 执行该拼接语句，构成 source→sink 闭合链。由于 `$pass_new` 位于单引号字符串字面量内，攻击者提交含单引号的值即可闭合字面量并注入任意 SQL 片段（如 `' , user='admin' -- `），从而改写任意用户口令。`$current_user` 来自 `dvwaCurrentUser()`（024.php:17），属于会话派生值，不是本次注入主通道。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 17,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-cf38b1a2cb95"
+          },
+          "properties": {
+            "finding_id": "GEN-cf38b1a2cb95",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-89",
+            "endpoint": "/024",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/business_logic",
+          "level": "error",
+          "message": {
+            "text": "DVWA 密码修改接口仅依赖可伪造的 HTTP_REFERER 做来源校验，导致 CSRF 强制改密/账户接管\n\n024.php 第 3 行在存在 GET 参数 Change 时进入改密流程；第 5 行用 stripos($_SERVER['HTTP_REFERER'], $_SERVER['SERVER_NAME']) !== false 判断请求来源，但 HTTP_REFERER 完全由客户端控制，攻击者只要在 Referer 中放入目标站点域名（如 TARGET 或 TARGET 的子串）即可通过校验。随后第 7-8 行直接读取 password_new/password_conf，第 11 行仅比较两次输入是否相等，第 14 行 md5 后在第 18-19 行拼入 UPDATE 语句修改当前用户密码。整个流程没有任何 CSRF token、没有旧密码校验、没有 Origin/Sec-Fetch-Site 校验，攻击者可诱导已登录受害者访问恶意页面，从而把受害者密码改为攻击者已知值，实现账户接管。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-a82244673cd8"
+          },
+          "properties": {
+            "finding_id": "LLM-a82244673cd8",
+            "confidence": 0.87,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-840",
+            "endpoint": "/024.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        }
+      ]
+    }
+  ]
+}

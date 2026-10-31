@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/path_traversal",
+              "name": "路径穿越 / 任意文件读写",
+              "shortDescription": {
+                "text": "路径穿越 / 任意文件读写（CWE-22）"
+              },
+              "fullDescription": {
+                "text": "外部输入控制文件路径，可越出预期目录读取、写入或删除文件。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/22.html",
+              "properties": {
+                "tags": [
+                  "path_traversal",
+                  "CWE-22",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/xss",
+              "name": "跨站脚本",
+              "shortDescription": {
+                "text": "跨站脚本（CWE-79）"
+              },
+              "fullDescription": {
+                "text": "外部输入未编码进入 HTML/JS 上下文，可在受害者浏览器执行脚本。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html",
+              "properties": {
+                "tags": [
+                  "xss",
+                  "CWE-79",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/csp",
+              "name": "CSP 配置缺陷",
+              "shortDescription": {
+                "text": "CSP 配置缺陷（CWE-693）"
+              },
+              "fullDescription": {
+                "text": "CSP 配置缺陷"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/693.html",
+              "properties": {
+                "tags": [
+                  "csp",
+                  "CWE-693",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-31T08:43:20.867461+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/path_traversal",
+          "level": "error",
+          "message": {
+            "text": "021.php 中 $_POST['include'] 未净化即拼接进页面 body（CWE-22 路径/内容注入）\n\n证据仅覆盖 021.php 第 12-14 行：第 14 行 `if (isset ($_POST['include'])) {` 只判断 POST 参数 include 是否存在，随后（第 15-16 行，见相邻候选）把 `$_POST['include']` 直接拼进 `$page['body']`。攻击者通过 POST 参数 include 提交任意字符串，代码未做白名单、basename、realpath 规范化或路径前缀校验。需要说明的是：本条候选的 source 被标注为 query `include`，但源码实际读取的是 `$_POST['include']`（POST 体参数），注入点应记为 POST 参数 include，而非 URL query。此外，第 14 行本身只是 isset 判断，真正的危险汇点是第 16 行的字符串拼接；本条候选把 isset 行当作 sink，证据链不完整，实际危害需结合 GEN-11054cd96202 一起判断。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "021.php"
+                },
+                "region": {
+                  "startLine": 12,
+                  "endLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-1b352c5348d3"
+          },
+          "properties": {
+            "finding_id": "GEN-1b352c5348d3",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-22",
+            "endpoint": "/021",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/xss",
+          "level": "warning",
+          "message": {
+            "text": "021.php POST 参数 include 未编码直接拼接进页面导致反射型 XSS（CSP nonce 可复用绕过）\n\n021.php 第 14-18 行读取 $_POST['include']，未做任何 HTML 实体编码或过滤，直接以字符串拼接方式追加到 $page['body']，随后该 body 被输出到响应页面（第 19-25 行继续拼接表单，说明 $page['body'] 为页面渲染内容）。攻击者提交包含 <script> 的 include 值即可在受害者浏览器执行任意脚本。虽然第 3-5 行设置了 CSP script-src 'self' 'unsafe-inline' 'nonce-TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA='，但该 nonce 是硬编码常量且第 10 行注释直接给出了可用示例 <script nonce=\"TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA=\">alert(1)</script>，攻击者可直接复用该 nonce 绕过 CSP；同时第 8 行显式设置 X-XSS-Protection: 0 关闭了浏览器 XSS 过滤器。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "021.php"
+                },
+                "region": {
+                  "startLine": 14,
+                  "endLine": 18
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-cd298cc9bb86"
+          },
+          "properties": {
+            "finding_id": "LLM-cd298cc9bb86",
+            "confidence": 0.85,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-79",
+            "endpoint": "/021.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/csp",
+          "level": "warning",
+          "message": {
+            "text": "021.php 第 3 行 CSP 同时启用 'unsafe-inline' 与固定 nonce，策略被削弱（CWE-693）\n\n证据为 021.php 第 2-3 行：`$headerCSP = \"Content-Security-Policy: script-src 'self' 'unsafe-inline' 'nonce-TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA=';\";`。该策略在 script-src 中同时声明 `'unsafe-inline'` 和一个硬编码 nonce。按 CSP 规范，当存在 nonce 或 hash 源时，`'unsafe-inline'` 会被忽略；但此处 nonce 值是写死在源码中的常量（base64 解码为 “Never going to give you up”），任何能读取源码或该响应头的攻击者都可复用同一 nonce，使 nonce 机制形同虚设。同时策略未包含 `object-src 'none'`、`base-uri 'none'`、`default-src` 等兜底指令。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "021.php"
+                },
+                "region": {
+                  "startLine": 2,
+                  "endLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-e8635bcf499d"
+          },
+          "properties": {
+            "finding_id": "SEM-e8635bcf499d",
+            "confidence": 0.6,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-693",
+            "endpoint": "/021",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

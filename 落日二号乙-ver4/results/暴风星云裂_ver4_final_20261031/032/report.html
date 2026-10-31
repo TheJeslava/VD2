@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-173026-0aaa2e</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-173026-0aaa2e · 生成时间: 2026-10-31T09:31:01.715848+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\032.zip · SHA256: 00f20c6c4951b7689cab1e0be3d0e1d93bb7cb42b3399af954133774b6e161fd</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次审计对象为单文件 PHP 脚本 032.php（24 行，约 4.2KB），无框架、无路由清单、无 source/sink 热点标注。去重后仅交付 1 条 finding：SEM-991eb6123bf3（weak_crypto，medium），标题为「客户端令牌生成使用 MD5 弱哈希」，定位 032.php 第 18 行，来源为规则命中，已附带 POC。需注意该条标题写 weak_crypto，但描述与 CWE-328 属弱哈希（weak_hash）语义，存在类型标注不一致，建议人工按 CWE-328 归类复核。最高危即此条 medium；本次无 high/critical 交付项。POC 齐全度为 1/1，但该 POC 属静态证据型（算法/常量层面），不具备 HTTP 动态复现条件，不能宣称可动态验证。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>客户端令牌生成使用 MD5 弱哈希（CWE-328）</td><td><code>032.php:18</code></td><td>0.7</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='SEM-991eb6123bf3'><h2>F-1 客户端令牌生成使用 MD5 弱哈希（CWE-328）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.7 · candidate / rule_verified+llm</p><p><b>位置：</b><code>032.php:17-18</code></p><p>在 032.php 第 17-18 行，页面脚本读取表单元素 phrase 的值（document.getElementById(&quot;phrase&quot;).value），随后执行 md5(rot13(phrase)) 并把结果写入隐藏/令牌字段 token（document.getElementById(&quot;token&quot;).value）。即令牌由客户端可完全控制的输入经 ROT13（无密钥的可逆替换）与 MD5（无盐、无迭代、已知碰撞的弱哈希）派生。攻击者只需知道或猜到 phrase 的取值即可离线复算出同一 token，无需任何密钥；ROT13 不提供任何机密性，MD5 也不提供抗碰撞/抗原像强度。校验环节（服务端对 token 的比对）在给定片段中未出现，因此“校验无效”的具体实现属证据不足，但令牌派生算法本身已构成弱哈希弱点。</p><p><b>影响：</b>令牌/校验值可被攻击者离线预测与伪造：任何能提交 phrase 的一方都能生成合法 token，从而绕过依赖该 token 的防篡改/防伪造校验，可能导致越权提交、请求伪造或业务逻辑绕过。由于是纯客户端计算，攻击者还可直接篡改 DOM 后提交任意 token 值。</p><p><b>CVE/CWE 论证：</b>对应 CWE-328（Use of Weak Hash）：MD5 用于安全用途（令牌派生）且无盐、无密钥、无迭代；ROT13 为可逆替换，不构成密钥材料。外部可达性：该逻辑位于 032.php 返回给浏览器的脚本中，任何能访问该页面的未认证用户均可触发并观察/复算 token，利用链在客户端闭合，无需认证。注意：本条为配置/实现型弱点，不依赖 HTTP 污点链；服务端比对逻辑未在片段中出现，故不宣称已实现端到端绕过。</p><p><b>修复建议：</b>1) 不要在客户端派生安全令牌：改由服务端使用 CSPRNG（如 Java SecureRandom / PHP random_bytes）生成至少 128 位随机令牌并绑定会话；2) 若必须做完整性校验，使用带密钥的 HMAC-SHA-256（服务端持有密钥）替代 md5(rot13(...))；3) 彻底移除 MD5 与 ROT13 在安全语义中的使用，口令场景改用 Argon2id/bcrypt/PBKDF2 并加盐；4) 服务端对 token 做常量时间比较并校验来源与会话绑定。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>032.php:18</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC（离线源码审计，不发送请求）：`032.php:18` 在客户端 JavaScript 中把用户输入的 `phrase`（`document.getElementById(&quot;phrase&quot;).value`）经 `rot13` 变换后交给 `md5()` 生成 `token` 字段值。该 token 由客户端可预测算法（ROT13 + MD5）派生，属于弱哈希/弱令牌生成（CWE-328 弱哈希，若该 token 被当作防伪/校验凭据使用则同时具备 CWE-327 弱加密语义）。攻击者无需密钥即可离线复算任意 `phrase` 对应的 token，从而绕过基于该 token 的校验或伪造请求。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 032.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 032.php
+- 行号: 18
+- 片段:
+```
+17: 		var phrase = document.getElementById(&quot;phrase&quot;).value;
+18: 		document.getElementById(&quot;token&quot;).value = md5(rot13(phrase));
+19: 	}
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

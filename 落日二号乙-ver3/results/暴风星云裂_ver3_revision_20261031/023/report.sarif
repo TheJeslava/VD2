@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/csrf",
+              "name": "跨站请求伪造",
+              "shortDescription": {
+                "text": "跨站请求伪造（CWE-352）"
+              },
+              "fullDescription": {
+                "text": "跨站请求伪造"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/352.html",
+              "properties": {
+                "tags": [
+                  "csrf",
+                  "CWE-352",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/brute_force",
+              "name": "暴力破解防护缺失",
+              "shortDescription": {
+                "text": "暴力破解防护缺失（CWE-307）"
+              },
+              "fullDescription": {
+                "text": "暴力破解防护缺失"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/307.html",
+              "properties": {
+                "tags": [
+                  "brute_force",
+                  "CWE-307",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/weak_hash",
+              "name": "弱哈希算法",
+              "shortDescription": {
+                "text": "弱哈希算法（CWE-328）"
+              },
+              "fullDescription": {
+                "text": "使用 MD5/SHA1 等不具备抗碰撞/抗暴力能力的哈希算法处理安全敏感数据。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/328.html",
+              "properties": {
+                "tags": [
+                  "weak_hash",
+                  "CWE-328",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/weak_crypto",
+              "name": "弱加密算法",
+              "shortDescription": {
+                "text": "弱加密算法（CWE-327）"
+              },
+              "fullDescription": {
+                "text": "弱加密算法"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/327.html",
+              "properties": {
+                "tags": [
+                  "weak_crypto",
+                  "CWE-327",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T17:19:07.076451+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "023.php 密码修改功能 SQL 注入（CWE-89）\n\n攻击者通过 GET 参数 password_new（023.php:5 `$pass_new = $_GET['password_new'];`）提交输入，该值在 023.php:11 仅经过 mysqli_real_escape_string 转义后，于 023.php:16 被直接拼接进 UPDATE 语句：`$insert = \"UPDATE `users` SET password = '$pass_new' WHERE user = '\" . $current_user . \"';\";`，随后在 023.php:17 交给 mysqli_query 执行。虽然 $pass_new 经过 mysqli_real_escape_string 处理，但 023.php:12 先对 $pass_new 执行 md5()，使进入 SQL 的值变为 32 位十六进制串，因此 password_new 本身难以直接闭合引号；真正的注入面在于 023.php:16 拼接的 $current_user（来自 dvwaCurrentUser()，023.php:15），该值未经转义直接进入单引号上下文。若当前用户名字段可被外部影响（如注册/用户名可控），即可闭合 `'` 注入任意 SQL。此外 023.php:17 的 die() 分支会把 mysqli_error 原文回显到页面，构成报错型注入的信息泄露通道。证据层面：password_new 的 md5 化削弱了直接注入可行性，$current_user 的污点来源在 code_pack 中未给出实现，故本条按 llm_inferred 记录。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "023.php"
+                },
+                "region": {
+                  "startLine": 15,
+                  "endLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-2fcabc51c287"
+          },
+          "properties": {
+            "finding_id": "GEN-2fcabc51c287",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-89",
+            "endpoint": "/023",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/csrf",
+          "level": "error",
+          "message": {
+            "text": "DVWA 密码修改接口（023.php）缺少 CSRF token 与旧密码校验，可被跨站强制改密接管账户\n\n023.php 在 `isset($_GET['Change'])` 成立时直接读取 `$_GET['password_new']` 与 `$_GET['password_conf']`，仅比较两者是否相等（第 9 行），随后 md5 后拼入 UPDATE 语句修改当前登录用户的密码（第 16-17 行）。整个流程没有任何 CSRF token、没有 Referer/Origin 校验、也没有要求提供旧密码。攻击者只需诱导已登录受害者在浏览器中访问一个携带 `Change=Change&password_new=X&password_conf=X` 的链接（GET 请求，可放入 <img> 标签），即可把受害者密码改为攻击者已知值，随后用新密码登录接管账户。由于是 GET 方法且无 token，利用门槛极低。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "023.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-fb8cc628a9b1"
+          },
+          "properties": {
+            "finding_id": "LLM-fb8cc628a9b1",
+            "confidence": 0.85,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-352",
+            "endpoint": "/023.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/brute_force",
+          "level": "error",
+          "message": {
+            "text": "023.php 口令修改流程缺少暴力破解防护（CWE-307）\n\n023.php:4-6 直接读取 password_new/password_conf 并进入口令更新流程（023.php:16-17），代码中未见失败计数、账户锁定、速率限制、验证码或延迟递增等反暴力措施。攻击者可对 023.php 高频提交请求，结合可预测的会话/参数进行口令猜测或批量尝试。证据缺口：限流是否由前置 Web 服务器、WAF 或 DVWA 框架层实现不在 code_pack 内；且该页面为口令修改而非登录校验，是否构成典型暴力破解需运行时确认。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "023.php"
+                },
+                "region": {
+                  "startLine": 4,
+                  "endLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-e5f2216eebb4"
+          },
+          "properties": {
+            "finding_id": "SEM-e5f2216eebb4",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-307",
+            "endpoint": "/023",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/weak_hash",
+          "level": "warning",
+          "message": {
+            "text": "023.php 使用无盐 MD5 存储用户密码（CWE-328）\n\n第 12 行对用户新密码仅做 `md5($pass_new)` 后直接写入 users 表，未使用盐值或慢哈希（bcrypt/argon2）。MD5 计算极快且无盐，一旦数据库泄露可被彩虹表/暴力快速还原，且相同密码产生相同哈希。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "023.php"
+                },
+                "region": {
+                  "startLine": 12,
+                  "endLine": 16
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-a3511d5e69f7"
+          },
+          "properties": {
+            "finding_id": "LLM-a3511d5e69f7",
+            "confidence": 0.75,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-328",
+            "endpoint": "/023.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/csrf",
+          "level": "warning",
+          "message": {
+            "text": "023.php 口令修改缺少 CSRF 防护（CWE-352）\n\n023.php:5-6 通过 GET 读取 password_new 与 password_conf，随后在 023.php:16-17 直接执行 UPDATE users SET password 的状态变更操作。代码中未见任何 CSRF token 校验、Referer/Origin 校验或二次确认机制，且状态变更使用 GET 方法，可被 `<img src=\"http://TARGET/023.php?password_new=x&password_conf=x\">` 这类跨站请求静默触发。攻击者只需诱导已登录受害者访问恶意页面，即可在受害者会话下改写其口令。证据缺口：会话 Cookie 的 SameSite 属性、DVWA 登录态校验逻辑不在 code_pack 内，需运行时复核。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "023.php"
+                },
+                "region": {
+                  "startLine": 4,
+                  "endLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-b5cfc3d8dbaa"
+          },
+          "properties": {
+            "finding_id": "SEM-b5cfc3d8dbaa",
+            "confidence": 0.71,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-352",
+            "endpoint": "/023",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/weak_crypto",
+          "level": "warning",
+          "message": {
+            "text": "023.php 使用 MD5 存储口令（CWE-328）\n\n023.php:12 `$pass_new = md5( $pass_new );` 对口令使用 MD5 单次无盐哈希后写入 users 表（023.php:16-17）。MD5 属已被攻破的快速哈希，存在大量彩虹表与 GPU 高速碰撞/爆破能力，且此处未加盐、未使用迭代型口令哈希，相同口令产生相同摘要，可被批量比对。注意：该弱点本质是口令哈希算法选择不当，应归类为 weak_hash（CWE-328），而非 weak_crypto（CWE-327，指 DES/ECB 等加密算法问题）。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "023.php"
+                },
+                "region": {
+                  "startLine": 11,
+                  "endLine": 12
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-de6429df0eff"
+          },
+          "properties": {
+            "finding_id": "SEM-de6429df0eff",
+            "confidence": 0.46,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-327",
+            "endpoint": "/023",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

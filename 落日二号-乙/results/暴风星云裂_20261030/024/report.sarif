@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/auth_bypass",
+              "name": "认证绕过",
+              "shortDescription": {
+                "text": "认证绕过（CWE-287）"
+              },
+              "fullDescription": {
+                "text": "认证流程可被跳过、伪造或降级，攻击者获得未授权身份。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/287.html",
+              "properties": {
+                "tags": [
+                  "auth_bypass",
+                  "CWE-287",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T14:48:54.571387+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/auth_bypass",
+          "level": "error",
+          "message": {
+            "text": "DVWA 密码修改功能仅依赖 HTTP_REFERER 校验，可伪造 Referer 绕过并任意修改当前用户密码（CSRF/信任边界缺陷）\n\n024.php 的密码修改逻辑（第 3-35 行）在修改密码前只做了一次来源校验：第 5 行用 stripos($_SERVER['HTTP_REFERER'], $_SERVER['SERVER_NAME']) !== false 判断请求是否来自本站。HTTP_REFERER 完全由客户端控制，攻击者只要在请求头中带上包含本站域名的 Referer 即可通过校验。校验通过后第 7-8 行直接读取 $_GET['password_new'] / $_GET['password_conf']，第 11 行比较相等后第 13 行做 mysqli_real_escape_string、第 14 行 md5 哈希，第 18 行拼接 UPDATE 语句、第 19 行执行，把当前用户（第 17 行 dvwaCurrentUser()）的密码改为攻击者指定值。由于没有 CSRF token、没有二次身份确认（旧密码），攻击者可构造恶意页面诱导已登录用户提交，或直接伪造 Referer 自行提交，实现账户接管。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-0441c3f5ab3e"
+          },
+          "properties": {
+            "finding_id": "LLM-0441c3f5ab3e",
+            "confidence": 0.85,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-287",
+            "endpoint": "/024.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "024.php 密码修改 UPDATE 语句中 $current_user 未转义直接拼接导致 SQL 注入\n\n第 18 行将 $current_user（来自第 17 行 dvwaCurrentUser()）直接拼进 UPDATE 语句，未做任何转义或参数化；第 19 行 mysqli_query 执行。虽然 password_new 在第 13 行经过 mysqli_real_escape_string，但 $current_user 完全没有处理。若 dvwaCurrentUser() 的返回值可受攻击者影响（例如来源于会话中的用户名、Cookie 或可注册的用户名），则可注入任意 SQL。该链的闭合依赖 dvwaCurrentUser() 的实现，而该函数不在 CODE PACK 中，因此作为候选上报并标注需人工确认。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "024.php"
+                },
+                "region": {
+                  "startLine": 17,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-166d7112dfbf"
+          },
+          "properties": {
+            "finding_id": "LLM-166d7112dfbf",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-89",
+            "endpoint": "/024.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        }
+      ]
+    }
+  ]
+}

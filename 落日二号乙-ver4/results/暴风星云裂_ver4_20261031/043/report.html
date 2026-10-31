@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-164645-ac6331</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-164645-ac6331 · 生成时间: 2026-10-31T08:47:29.715741+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\043.zip · SHA256: 07af6f04e9411f0557b345faaf32fcbb3e1405cb4402c57b6fc79a4bf804244f</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>2</b>findings</div>
+<div class="metric"><b>2</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅覆盖单文件 PHP 脚本 043.php（35 行，无框架、无路由清单）。已去重后交付 2 条 file_upload 发现：规则命中 GEN-729d053acdfd（critical，043.php:20，任意文件写入 CWE-434）与 LLM 命中 LLM-7a70487f2fb0（high，043.php:27，仅校验扩展名与 getimagesize，可上传含 PHP 代码的图片写入 hackable/uploads/ 导致 RCE）。两者均带 POC，但 POC 为文本工件，未执行、未做动态验证；最高危为 GEN-729d053acdfd 的任意文件写入。需注意：surface_notes 明确说明本次未提供 043.php 的源码片段，因此行号与汇点结论来自上游规则/模型，属静态推断（llm_inferred 级），不是已验证事实。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>file_upload</code></td><td>043.php 不安全文件上传导致任意文件写入（CWE-434）</td><td><code>043.php:20</code></td><td>0.78</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-high'>high</span></td><td><code>file_upload</code></td><td>DVWA 文件上传端点（043.php）仅校验扩展名与 getimagesize，可上传含 PHP 代码的图片并写入 hackable/uploads/ 导致远程代码执行</td><td><code>043.php:27</code></td><td>0.8</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-729d053acdfd'><h2>F-1 043.php 不安全文件上传导致任意文件写入（CWE-434）</h2><p><span class='sev sev-critical'>critical</span> <code>file_upload</code> / CWE-434 · 置信度 0.78 · candidate / rule_verified+llm</p><p><b>位置：</b><code>043.php:18-20</code></p><p>攻击者通过 HTTP 文件上传字段 `uploaded` 提交文件（043.php:12 读取上传内容并写入 `$uploaded_tmp`），代码随后在 043.php:20 直接调用 `move_uploaded_file( $uploaded_tmp, $target_path )` 将临时文件移动到 `$target_path`。从给出的代码片段看，在 043.php:12 到 043.php:20 之间没有出现扩展名白名单、MIME 校验、文件内容检查或目标路径规范化等有效校验，因此攻击者可以控制上传文件的原始文件名/内容，使 `$target_path` 指向 Web 可访问目录并写入可执行脚本。由于校验缺失，污点从上传字段直达文件写入汇点，利用链闭合。</p><p><b>影响：</b>任意文件写入：攻击者可将 .php 等可执行脚本上传至 Web 根目录，通过访问该文件触发服务端代码执行，进而导致远程代码执行（RCE）、服务器失陷、数据泄露与横向移动；即使不可执行，也可覆盖或投放任意文件造成完整性破坏。</p><p><b>CVE/CWE 论证：</b>CWE-434（Unrestricted Upload of File with Dangerous Type）。外部可达性：上传入口为 HTTP 请求的 `uploaded` 文件字段，无需认证即可访问（证据中未见鉴权逻辑）。利用链闭合：source（043.php:12 上传字段）→ `$uploaded_tmp` → sink（043.php:20 `move_uploaded_file`）之间无有效净化，攻击者完全控制写入内容与目标路径，满足无需认证的外部可利用条件。</p><p><b>修复建议：</b>1) 对上传文件实施扩展名白名单校验（仅允许业务必需类型），并基于服务端解析的真实 MIME/文件头而非客户端 Content-Type 判断；2) 使用 `pathinfo()` 提取扩展名后与白名单严格比对，拒绝双扩展名与大小写绕过；3) 将上传目录置于 Web 根之外，或对上传目录禁用脚本执行（如 PHP 引擎关闭、`Content-Disposition: attachment`）；4) 上传后重命名为随机文件名，避免攻击者控制路径；5) 对 `$target_path` 做 `realpath()` 规范化并校验其位于允许目录内，防止路径穿越；6) 限制文件大小并配合最小权限运行 Web 进程。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>043.php:12</code></td><td>从 upload `uploaded` 读取外部输入</td><td>污点进入 uploaded_tmp</td><td></td></tr><tr><td>2</td><td><code>043.php:20</code></td><td>危险汇点：if( !move_uploaded_file( $uploaded_tmp, $target_path ) ) {</td><td>污点进入 file_upload 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 043.php（第 20 行附近上传处理逻辑）的不安全文件上传 POC，入口为根路径 /043。源码直接使用 multipart 字段 `uploaded` 的文件名与内容落盘，缺少扩展名白名单，可上传可执行脚本。目标地址统一使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/043&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 不安全文件上传 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/043&#x27; \
+  -F &#x27;Upload=Upload&#x27; \
+  -F &#x27;uploaded=@sunset.jsp;filename=sunset.jsp&#x27;</pre><div class='muted'>预期：上传文件可访问/解析，返回 webshell 执行结果。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/043&#x27; \
+  -F &#x27;Upload=Upload&#x27; \
+  -F &#x27;uploaded=@sunset.jsp;filename=sunset.jsp&#x27;
+</pre><h4>request.http</h4><pre>POST /043 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: multipart/form-data; boundary=SUNSET
+Content-Length: 215
+
+--SUNSET
+Content-Disposition: form-data; name=&quot;Upload&quot;
+
+Upload
+--SUNSET
+Content-Disposition: form-data; name=&quot;uploaded&quot;; filename=&quot;sunset.jsp&quot;
+Content-Type: application/octet-stream
+
+SUNSET_POC
+--SUNSET--
+
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-7a70487f2fb0'><h2>F-2 DVWA 文件上传端点（043.php）仅校验扩展名与 getimagesize，可上传含 PHP 代码的图片并写入 hackable/uploads/ 导致远程代码执行</h2><p><span class='sev sev-high'>high</span> <code>file_upload</code> / CWE-434 · 置信度 0.8 · candidate / llm_inferred</p><p><b>位置：</b><code>043.php:3-27</code></p><p>043.php 在收到 POST 参数 Upload 后，直接取 $_FILES[&#x27;uploaded&#x27;][&#x27;name&#x27;] 经 basename() 拼接到 $target_path（DVWA_WEB_PAGE_TO_ROOT.&quot;hackable/uploads/&quot;），并用 move_uploaded_file() 落盘。校验仅有三个条件：扩展名（substr 取最后一个点之后）小写后属于 jpg/jpeg/png、文件大小 &lt; 100000 字节、getimagesize() 返回真。getimagesize() 只检查文件头是否为合法图片，不阻止文件尾部附加任意 PHP 代码（图片马）；扩展名检查只看最后一个点后的字符串，攻击者可将文件名设为 shell.php.jpg 或 shell.jpg.php 之类，最终落盘文件名由 basename() 原样保留，若服务器对 .php 后缀解析（或利用多后缀/解析漏洞），即可执行任意 PHP 代码。攻击者无需认证即可通过该端点写入 webshell，形成 RCE。</p><p><b>影响：</b>未授权攻击者可上传并执行任意 PHP 代码，获取服务器控制权，读取/篡改数据库与文件系统。</p><p><b>CVE/CWE 论证：</b>CWE-434 不受限制的危险类型文件上传。外部可达（POST 上传端点），无需认证，校验可被图片马与多后缀绕过，链闭合至 move_uploaded_file 落盘并可执行。</p><p><b>修复建议：</b>使用白名单校验扩展名并重命名文件为随机名+固定安全扩展名；用 finfo/getimagesize 结合内容重编码图片剥离附加代码；将上传目录置于 Web 根之外或禁用该目录 PHP 解析；限制文件大小与 MIME。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>043.php:3</code></td><td>检测到 POST 参数 Upload 即进入上传处理分支</td><td>攻击者提交 multipart 表单，含 Upload 与 uploaded 文件字段</td><td></td></tr><tr><td>2</td><td><code>043.php:9-12</code></td><td>从 $_FILES[&#x27;uploaded&#x27;] 读取文件名、扩展名、大小、临时路径</td><td>文件名完全由客户端控制</td><td></td></tr><tr><td>3</td><td><code>043.php:15-17</code></td><td>仅校验扩展名属于 jpg/jpeg/png、大小 &lt;100000、getimagesize 通过</td><td>扩展名取最后一个点之后；getimagesize 只验证文件头为图片，不阻止尾部附加 PHP 代码</td><td>图片马（GIF89a/PNG 头 + &lt;?php ... ?&gt;）可通过 getimagesize；扩展名检查只看最后一段，可用 shell.php.jpg 或依赖服务器多后缀解析</td></tr><tr><td>4</td><td><code>043.php:5-6</code></td><td>用 basename() 拼接目标路径，保留攻击者文件名</td><td>$target_path = DVWA_WEB_PAGE_TO_ROOT.&quot;hackable/uploads/&quot;.basename(name)</td><td></td></tr><tr><td>5</td><td><code>043.php:20</code></td><td>move_uploaded_file 将临时文件移动到目标路径</td><td>恶意文件落盘到 hackable/uploads/ 下，文件名可控</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /vulnerabilities/upload/ (043.php)（POST）的 不安全文件上传 POC。注入点：multipart filename；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/vulnerabilities/upload/ (043.php)&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 不安全文件上传 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/vulnerabilities/upload/ (043.php)&#x27; \
+  -F &#x27;Upload=Upload&#x27; \
+  -F &#x27;uploaded=@sunset.jsp;filename=sunset.jsp&#x27;</pre><div class='muted'>预期：上传文件可访问/解析，返回 webshell 执行结果。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/vulnerabilities/upload/ (043.php)&#x27; \
+  -F &#x27;Upload=Upload&#x27; \
+  -F &#x27;uploaded=@sunset.jsp;filename=sunset.jsp&#x27;
+</pre><h4>request.http</h4><pre>POST /vulnerabilities/upload/ (043.php) HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: multipart/form-data; boundary=SUNSET
+Content-Length: 215
+
+--SUNSET
+Content-Disposition: form-data; name=&quot;Upload&quot;
+
+Upload
+--SUNSET
+Content-Disposition: form-data; name=&quot;uploaded&quot;; filename=&quot;sunset.jsp&quot;
+Content-Type: application/octet-stream
+
+SUNSET_POC
+--SUNSET--
+
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

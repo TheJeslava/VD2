@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/path_traversal",
+              "name": "路径穿越 / 任意文件读写",
+              "shortDescription": {
+                "text": "路径穿越 / 任意文件读写（CWE-22）"
+              },
+              "fullDescription": {
+                "text": "外部输入控制文件路径，可越出预期目录读取、写入或删除文件。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/22.html",
+              "properties": {
+                "tags": [
+                  "path_traversal",
+                  "CWE-22",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/xss",
+              "name": "跨站脚本",
+              "shortDescription": {
+                "text": "跨站脚本（CWE-79）"
+              },
+              "fullDescription": {
+                "text": "外部输入未编码进入 HTML/JS 上下文，可在受害者浏览器执行脚本。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html",
+              "properties": {
+                "tags": [
+                  "xss",
+                  "CWE-79",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/csp",
+              "name": "CSP 配置缺陷",
+              "shortDescription": {
+                "text": "CSP 配置缺陷（CWE-693）"
+              },
+              "fullDescription": {
+                "text": "CSP 配置缺陷"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/693.html",
+              "properties": {
+                "tags": [
+                  "csp",
+                  "CWE-693",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-31T09:29:05.350397+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/path_traversal",
+          "level": "error",
+          "message": {
+            "text": "021.php 将 POST 参数 include 原样拼接进页面 body（反射型注入候选，非路径穿越）\n\n021.php:15-16 中 `$page['body'] .= \"\\n\\t\" . $_POST['include'] . \"...\"` 把外部 POST 参数 include 未经任何编码直接拼接到响应 body。这是输出拼接，不是文件路径操作：片段中没有 include/require/fopen 等文件函数，也没有路径分隔符处理。因此按类型边界应归为反射型内容注入（若响应为 HTML 则为 XSS 类），而非 path_traversal。候选将其标为 CWE-22 属于类型误判。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "021.php"
+                },
+                "region": {
+                  "startLine": 14,
+                  "endLine": 16
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-11054cd96202"
+          },
+          "properties": {
+            "finding_id": "GEN-11054cd96202",
+            "confidence": 0.45,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-22",
+            "endpoint": "/021",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/xss",
+          "level": "warning",
+          "message": {
+            "text": "021.php 中 POST 参数 include 未编码直接拼入页面 body，导致反射型 XSS（CSP nonce 可绕过）\n\n021.php 第 14-18 行读取 $_POST['include']，未做任何 HTML 实体编码（无 htmlspecialchars/htmlentities），直接字符串拼接进 $page['body']，随后该 body 被输出到页面。攻击者提交含 <script> 或事件处理器的 payload 即可在受害者浏览器执行任意 JS。第 3-5 行设置的 CSP 使用 script-src 'self' 'unsafe-inline' 'nonce-TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA='，其中 'unsafe-inline' 使内联脚本被允许；且 nonce 值硬编码在源码第 3 行与第 10 行注释中，攻击者可直接复用该 nonce 构造 <script nonce=\"...\"> 绕过 CSP。第 8 行还显式关闭 X-XSS-Protection。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "021.php"
+                },
+                "region": {
+                  "startLine": 14,
+                  "endLine": 18
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-cd298cc9bb86"
+          },
+          "properties": {
+            "finding_id": "LLM-cd298cc9bb86",
+            "confidence": 0.85,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-79",
+            "endpoint": "/021.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/csp",
+          "level": "warning",
+          "message": {
+            "text": "021.php 硬编码 nonce 且 CSP 允许 'unsafe-inline'（CWE-693 防护机制失效）\n\n021.php:3 定义 `$headerCSP = \"Content-Security-Policy: script-src 'self' 'unsafe-inline' 'nonce-TmV2ZXIgZ29pbmcgdG8gZ2l2ZSB5b3UgdXA=';\"`。两个缺陷：其一，nonce 为固定常量（base64 解码为 \"Never going to give you up\"），对所有请求、所有用户相同，攻击者一旦读到一次即可在注入脚本上复用该 nonce，nonce 机制完全失效；其二，同时启用 'unsafe-inline'，使内联脚本无需 nonce 即可执行，进一步架空 CSP。二者叠加使 CSP 对 XSS 基本无防护能力。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "021.php"
+                },
+                "region": {
+                  "startLine": 2,
+                  "endLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-e8635bcf499d"
+          },
+          "properties": {
+            "finding_id": "SEM-e8635bcf499d",
+            "confidence": 0.7,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-693",
+            "endpoint": "/021",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

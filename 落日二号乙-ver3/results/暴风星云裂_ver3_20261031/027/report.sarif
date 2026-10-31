@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.0.0",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/command_injection",
+              "name": "OS 命令注入",
+              "shortDescription": {
+                "text": "OS 命令注入（CWE-78）"
+              },
+              "fullDescription": {
+                "text": "外部输入进入 shell/进程执行参数，攻击者可追加或替换系统命令。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/78.html",
+              "properties": {
+                "tags": [
+                  "command_injection",
+                  "CWE-78",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-30T17:02:48.843055+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/command_injection",
+          "level": "error",
+          "message": {
+            "text": "027.php ping 功能通过 $_REQUEST['ip'] 拼接 shell_exec 导致命令注入（黑名单可绕过）\n\n027.php 在收到 POST 参数 Submit 后，从 $_REQUEST['ip'] 读取用户输入 $target（第 5 行），仅用 str_replace 删除 '&&' 与 ';' 两个子串（第 8-14 行）作为黑名单，随后直接把 $target 拼接到 shell_exec('ping -c 4 ' . $target)（*nix，第 23 行）或 shell_exec('ping ' . $target)（Windows，第 19 行）执行。黑名单只过滤 '&&' 和 ';'，未过滤管道符 '|'、后台执行 '&'、命令替换反引号、$()、换行等 shell 元字符，也未使用 escapeshellarg/escapeshellcmd，因此攻击者可在 ip 参数中注入任意系统命令，实现远程命令执行。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "027.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 27
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-c9f36281b7cf"
+          },
+          "properties": {
+            "finding_id": "LLM-c9f36281b7cf",
+            "confidence": 0.9,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-78",
+            "endpoint": "/027.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/command_injection",
+          "level": "error",
+          "message": {
+            "text": "027.php Windows 分支 ping 命令拼接导致 OS 命令注入（CWE-78）\n\n攻击者通过 HTTP query 参数 `ip` 提供输入，027.php:5 将其读入 `$target`；027.php:17 用 `stristr(php_uname('s'),'Windows NT')` 判断运行平台，命中 Windows 分支后，027.php:19 执行 `$cmd = shell_exec( 'ping  ' . $target );`，把 `$target` 直接字符串拼接到 shell 命令中。代码未对 `$target` 做任何白名单校验、转义（如 escapeshellarg）或参数化，因此 `ip` 中的 shell 元字符（`&`、`|`、`;`、`&&` 等）会被 shell 解释，形成命令注入。该分支仅在 Windows 主机上触发，属于平台相关但外部可达的注入点。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "027.php"
+                },
+                "region": {
+                  "startLine": 17,
+                  "endLine": 19
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-2b40f95f1bb0"
+          },
+          "properties": {
+            "finding_id": "GEN-2b40f95f1bb0",
+            "confidence": 0.83,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-78",
+            "endpoint": "/027",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/command_injection",
+          "level": "error",
+          "message": {
+            "text": "027.php *nix 分支 ping -c 4 命令拼接导致 OS 命令注入（CWE-78）\n\n攻击者通过 HTTP query 参数 `ip` 提供输入，027.php:5 将其读入 `$target`；当 027.php:17 的平台判断不成立（非 Windows，即 *nix 分支）时，027.php:23 执行 `$cmd = shell_exec( 'ping  -c 4 ' . $target );`，把 `$target` 直接拼接到 shell 命令。代码未对 `$target` 做白名单校验或 `escapeshellarg` 转义，`ip` 中的 `;`、`|`、`&&`、`$()`、反引号等元字符会被 shell 解释，构成命令注入。该分支在 Linux/Unix 主机上默认触发，是主要利用路径。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "027.php"
+                },
+                "region": {
+                  "startLine": 21,
+                  "endLine": 23
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-c4599ae29817"
+          },
+          "properties": {
+            "finding_id": "GEN-c4599ae29817",
+            "confidence": 0.83,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-78",
+            "endpoint": "/027",
+            "http_method": "ANY",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

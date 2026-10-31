@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-010458-55c073</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-010458-55c073 · 生成时间: 2026-10-30T17:05:41.255142+00:00</p>
+<p>输入: C:\Users\liyuf\Desktop\794\暴风星云裂\046.zip · SHA256: 9d98d51f3b7f8ead39aea7b49f01b44680c06b424521a0bf068da8c5c5a86a40</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>3</b>findings</div>
+<div class="metric"><b>3</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次审计范围仅 1 个 PHP 文件（046.php，14 行），共交付 3 条去重 findings，全部集中在会话标识生成环节：最高危为 SEM-19354a0facf2（weak_id，high），046.php 第 6 行会话标识基于可预测递增计数器；另有 SEM-7da0188b59a9（weak_crypto，medium，第 10 行 MD5 生成会话 Cookie 值，实为弱哈希 CWE-328）与 LLM-e9310d5416a7（weak_random，medium，第 11 行自增计数器 + md5 组合导致会话 ID 可预测）。3 条均带 POC，但均为静态证据型 POC（算法/计数器语义推断），不含 HTTP 请求响应验证，不能宣称可动态复现。攻击面测绘指出第 2 行为唯一 source 热点、sink 热点为空，该数据流去向未被任何 finding 覆盖，需人工通读确认。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>weak_id</code></td><td>046.php 会话标识基于可预测递增计数器（弱 ID，CWE-330）</td><td><code>046.php:6</code></td><td>0.7</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_crypto</code></td><td>046.php 使用 MD5 生成会话 Cookie 值（弱哈希，CWE-328）</td><td><code>046.php:10</code></td><td>0.72</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-medium'>medium</span></td><td><code>weak_random</code></td><td>DVWA weak_id 模块使用自增计数器 md5 生成会话 Cookie（可预测会话 ID）</td><td><code>046.php:11</code></td><td>0.72</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='SEM-19354a0facf2'><h2>F-1 046.php 会话标识基于可预测递增计数器（弱 ID，CWE-330）</h2><p><span class='sev sev-high'>high</span> <code>weak_id</code> / CWE-330 · 置信度 0.7 · candidate / rule_verified+llm</p><p><b>位置：</b><code>046.php:5-6</code></p><p>攻击者通过请求携带/接收 dvwaSession Cookie 参与会话。046.php:5 判断 POST 后，第 6 行 if (!isset($_SESSION[&#x27;last_session_id_high&#x27;])) 初始化会话计数器，第 7 行置为 0，第 9 行每次请求自增，第 10 行 md5 后第 11 行写入 Cookie。校验无效的根因是标识的熵源为单调递增整数：取值空间极小且顺序可预测，攻击者无需任何秘密即可枚举出全部可能值（配合 md5 预计算表直接对应），服务端也没有绑定 IP/UA 或做二次校验。最终危险操作是把该可预测值作为会话标识下发并在后续请求中作为身份凭据使用。</p><p><b>影响：</b>会话预测与劫持：攻击者可枚举/推算 dvwaSession 值，冒充其他会话访问受保护页面，造成越权与敏感数据泄露；结合 Cookie 未设 Secure/HttpOnly，还可被中间人或脚本窃取。</p><p><b>CVE/CWE 论证：</b>CWE-330（Use of Insufficiently Random Values）/CWE-340（Generation of Predictable Numbers or Identifiers）：046.php:6-7 以 0 初始化、046.php:9 单调自增作为会话标识来源，熵远低于安全要求。外部可达性：POST 请求即可触发（046.php:5），无需认证。利用链闭合：请求 → 计数器初始化/自增（046.php:6-9）→ md5（046.php:10）→ setcookie 下发（046.php:11）→ 攻击者预测并伪造 Cookie。证据为源码推断，未做动态验证。</p><p><b>修复建议：</b>使用 CSPRNG 生成会话 ID（random_bytes / session_regenerate_id(true)），保证 ≥128 bit 熵且不可预测；登录成功后强制轮换会话 ID；将会话与用户绑定并在服务端校验；Cookie 设置 Secure、HttpOnly、SameSite=Lax/Strict；避免使用自增计数器或时间戳作为标识来源。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>046.php:6</code></td><td>会话标识由时间/递增值派生；需跨请求预测并确认服务端接受</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>针对 /046（ANY）的 弱 ID / 可预测会话标识 POC。注入点：ANY 参数 session cookie；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/046&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 弱 ID / 可预测会话标识 载荷</b><pre>curl -sS -i -X ANY &#x27;http://TARGET:8080/046?session cookie=SUNSET_PROBE&#x27;</pre><div class='muted'>预期：按漏洞类型观察相应的异常响应/副作用。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X ANY &#x27;http://TARGET:8080/046?session cookie=SUNSET_PROBE&#x27;
+</pre><h4>request.http</h4><pre>ANY /046 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 27
+
+session cookie=SUNSET_PROBE
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='SEM-7da0188b59a9'><h2>F-2 046.php 使用 MD5 生成会话 Cookie 值（弱哈希，CWE-328）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_crypto</code> / CWE-327 · 置信度 0.72 · candidate / rule_verified+llm</p><p><b>位置：</b><code>046.php:9-10</code></p><p>攻击者无需输入任何参数：在 046.php 第 5 行判断 REQUEST_METHOD 为 POST 后，第 9 行把 $_SESSION[&#x27;last_session_id_high&#x27;] 自增，第 10 行 $cookie_value = md5($_SESSION[&#x27;last_session_id_high&#x27;]) 用 MD5 对一个小整数计数器做摘要，第 11 行通过 setcookie(&quot;dvwaSession&quot;, $cookie_value, time()+3600, &quot;/vulnerabilities/weak_id/&quot;, $_SERVER[&#x27;HTTP_HOST&#x27;], false, false) 下发。校验之所以无效，是因为 MD5 不是为不可预测性设计的：输入空间仅为递增整数（0,1,2,...），攻击者可离线枚举 md5(0)、md5(1)… 建立完整映射表，把 Cookie 值直接还原为计数器值；同时 setcookie 的 secure 与 httponly 两个标志位均为 false，Cookie 可在明文 HTTP 下传输并被脚本读取。最终危险操作是把可预测、可离线反推的摘要值当作会话标识写入客户端 Cookie。注意：该候选原始类型标注为 weak_crypto，但按 CWE 分类，MD5 用于会话标识属 weak_hash（CWE-328），不是 DES/ECB 类加密算法问题（CWE-327）。</p><p><b>影响：</b>会话标识可预测/可伪造：攻击者枚举 md5(小整数) 即可猜出其他用户的 dvwaSession 值，进而劫持会话、以受害者身份访问 /vulnerabilities/weak_id/ 下的功能；由于 Cookie 未设 Secure/HttpOnly，还可经明文信道或 XSS 窃取。影响为身份冒用与越权访问，不涉及 RCE。</p><p><b>CVE/CWE 论证：</b>CWE-328（Use of Weak Hash）：046.php:10 对安全用途（会话 Cookie 值）使用 MD5；CWE-330/CWE-340 辅助说明熵源为可预测递增整数。外部可达性：该逻辑位于 POST 请求处理路径（046.php:5），任何未认证访问者提交 POST 即可触发并获取 Cookie，无需登录、无需特权。利用链闭合：POST → 计数器自增（046.php:9）→ md5 摘要（046.php:10）→ setcookie 下发（046.php:11）→ 攻击者离线枚举映射并伪造 Cookie。证据等级为源码推断，未做运行时验证。</p><p><b>修复建议：</b>改用 CSPRNG 生成会话标识：如 PHP 7+ 的 bin2hex(random_bytes(32)) 或 session_regenerate_id(true)，不要对计数器做摘要；若必须保留派生关系，使用 hash_hmac(&#x27;sha256&#x27;, $value, $server_side_secret) 并保证密钥不泄露。同时把 setcookie 的 secure 设为 true、httponly 设为 true，并在全站强制 HTTPS；会话标识应有足够熵（≥128 bit）且不可枚举。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>046.php:10</code></td><td>弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性</td><td>语义模式命中</td><td>需按 notes 中的运行时/跨文件条件复核</td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC：046.php:10 使用 MD5 派生会话 Cookie 值，MD5 属弱哈希（CWE-328），且输入空间为自增整数，进一步降低安全性。无需发送请求。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 046.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 046.php
+- 行号: 10
+- 片段:
+```
+9: 	$_SESSION[&#x27;last_session_id_high&#x27;]++;
+10: 	$cookie_value = md5($_SESSION[&#x27;last_session_id_high&#x27;]);
+11: 	setcookie(&quot;dvwaSession&quot;, $cookie_value, time()+3600, &quot;/vulnerabilities/weak_id/&quot;, $_SERVER[&#x27;HTTP_HOST&#x27;], false, false);
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-e9310d5416a7'><h2>F-3 DVWA weak_id 模块使用自增计数器 md5 生成会话 Cookie（可预测会话 ID）</h2><p><span class='sev sev-medium'>medium</span> <code>weak_random</code> / CWE-330 · 置信度 0.72 · candidate / llm_inferred</p><p><b>位置：</b><code>046.php:9-11</code></p><p>046.php 在 POST 请求时把 $_SESSION[&#x27;last_session_id_high&#x27;] 自增后直接 md5() 作为 Cookie `dvwaSession` 的值下发。该值完全由单调递增的整数决定（md5(1)、md5(2)、md5(3)…），不含任何随机源，攻击者可离线枚举全部候选值，从而预测/伪造其他用户的会话标识，属于弱会话 ID 生成（CWE-330/CWE-340）。</p><p><b>影响：</b>会话标识可预测，攻击者可枚举/伪造 dvwaSession，导致会话劫持或身份冒用（在依赖该 Cookie 做身份判定时）。</p><p><b>CVE/CWE 论证：</b>CWE-330 使用不充分的随机值 / CWE-340 可预测的会话标识；无需认证即可通过 POST 触发并观察生成规律，链闭合。</p><p><b>修复建议：</b>使用 CSPRNG（random_bytes/bin2hex 或 session_regenerate_id）生成会话标识，避免由自增计数器派生。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>046.php:5</code></td><td>仅当 REQUEST_METHOD 为 POST 时进入 ID 生成分支</td><td>触发条件成立</td><td></td></tr><tr><td>2</td><td><code>046.php:9</code></td><td>会话计数器自增，取值空间为连续整数 1,2,3,...</td><td>整数序列，无随机性</td><td></td></tr><tr><td>3</td><td><code>046.php:10</code></td><td>对计数器做 md5，得到确定性可枚举的 Cookie 值</td><td>md5(n)，可离线预计算</td><td></td></tr><tr><td>4</td><td><code>046.php:11</code></td><td>通过 setcookie 下发 dvwaSession，作用域 /vulnerabilities/weak_id/</td><td>可预测 Cookie 写入客户端</td><td></td></tr></tbody></table><h3>POC</h3><p>静态证据型 POC：046.php:11 使用 md5($_SESSION[&#x27;last_session_id_high&#x27;]) 生成 dvwaSession Cookie 值，会话标识仅由自增整数派生，属可预测弱随机/弱标识（CWE-330）。无需发送请求，源码审计即可确认。</p><ol><li><b>在源码中定位证据</b><pre>grep -n -A2 -B2 &#x27;&lt;evidence&gt;&#x27; 046.php</pre><div class='muted'>预期：命中硬编码凭据/弱算法/弱随机数调用</div></li><li><b>人工确认凭据有效性或算法使用场景</b><pre>（离线审查）</pre><div class='muted'>预期：确认凭据仍有效或算法保护敏感数据</div></li></ol><details><summary>POC 脚本</summary><h4>poc_readme.md</h4><pre># 静态证据
+
+- 文件: 046.php
+- 行号: 11
+- 片段:
+```
+	$_SESSION[&#x27;last_session_id_high&#x27;]++;
+	$cookie_value = md5($_SESSION[&#x27;last_session_id_high&#x27;]);
+	setcookie(&quot;dvwaSession&quot;, $cookie_value, time()+3600, &quot;/vulnerabilities/weak_id/&quot;, $_SERVER[&#x27;HTTP_HOST&#x27;], false, false);
+```
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>
