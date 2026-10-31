@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-214817-2a1c5d</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-214817-2a1c5d · 生成时间: 2026-10-31T13:49:03.979033+00:00</p>
+<p>输入: $WORKSPACE\暴风星云裂\042.zip · SHA256: 56c6109a46f6b0f847124698111455904f6d936639464da066a8713062e29119</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：042.php 第 2 行附近读取的 query 参数 id 被拼接进 SQL 语句，构成 SQL 注入（CWE-89），严重度 critical，已附带 POC（HTTP 型，可对 TARGET 复现，仅限授权测试）。这是本次唯一交付项，也是最高危项。POC 齐全度：1/1 条 finding 有 POC；但该 POC 属静态推导的 HTTP 请求文本，未做动态验证。其余攻击面（命令执行、路径穿越、SSRF、XSS、弱哈希/弱随机/Cookie 标志、信任边界）在 surface_notes 中被列为优先审计点，但本次 findings 未覆盖，需人工复核。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>042.php 基于 query 参数 id 的 SQL 注入（CWE-89）</td><td><code>042.php:12</code></td><td>0.78</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-65bf75938433'><h2>F-1 042.php 基于 query 参数 id 的 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.78 · candidate / rule_verified+llm</p><p><b>位置：</b><code>042.php:10-12</code></p><p>攻击者通过 HTTP 请求的 query 参数 `id` 提供输入（042.php:5 读取该参数），该值未经任何过滤、类型转换或参数化，被直接拼接进 SQL 语句：042.php:11 构造 `$query = &quot;SELECT first_name, last_name FROM users WHERE user_id = $id;&quot;`，随后在 042.php:12 通过 `mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $query)` 执行。由于 `$id` 处于 WHERE 条件的数值位置且无引号包裹，攻击者可注入 `1 OR 1=1`、`1 UNION SELECT ...` 等片段改变查询语义；代码中不存在 mysqli_real_escape_string、intval、预处理语句或白名单校验，因此校验完全缺失。错误信息还会经 `mysqli_error(...)` 回显（042.php:12 的 die 分支），进一步泄露数据库结构，便于构造 UNION 注入。</p><p><b>影响：</b>可读取 users 表之外的数据（如通过 UNION 提取数据库名、表名、其他表字段），造成敏感数据泄露；结合堆叠/写文件能力可能进一步导致数据篡改或服务器文件写入（取决于数据库权限）。错误回显降低了利用门槛。</p><p><b>CVE/CWE 论证：</b>CWE-89（SQL 注入）。外部可达性：注入点为 HTTP query 参数 `id`，无需认证即可访问 042.php 触发；利用链闭合：source（042.php:5 的 `id`）→ 字符串拼接（042.php:11）→ 执行汇点 `mysqli_query`（042.php:12），中间无净化函数，链路完整。证据等级为源码推断（llm_inferred），未做动态验证。</p><p><b>修复建议：</b>改用参数化查询：`$stmt = $GLOBALS[&quot;___mysqli_ston&quot;]-&gt;prepare(&quot;SELECT first_name, last_name FROM users WHERE user_id = ?&quot;); $stmt-&gt;bind_param(&quot;i&quot;, $id); $stmt-&gt;execute();`；若必须拼接，先对 `$id` 做 `intval()` 强制数值化并校验范围。关闭向用户回显的 `mysqli_error` 详细信息，改为记录到服务端日志。数据库账号遵循最小权限，禁止 FILE 权限。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>042.php:5</code></td><td>从 query `id` 读取外部输入</td><td>污点进入 query</td><td></td></tr><tr><td>2</td><td><code>042.php:12</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $query) or die( &#x27;&lt;pre&gt;&#x27; . mysqli_error($GLOBALS[&quot;___mysqli_ston&quot;]) . &#x27;&lt;/pre&gt;&#x27; );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 042.php 的 SQL 注入 POC（POST 方法）。注入点为 POST 参数 id，源码在 042.php:12 处将该参数拼入 SQL 语句，未做有效净化。注意：本条草稿的 endpoint 写作 /042，与 file_path 042.php 不一致，需以源码实际路由为准。目标地址统一使用 TARGET 占位符，仅限授权测试。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/042&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/042&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/042&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>POST /042 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 42
+
+id=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

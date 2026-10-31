@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-214553-d73b53</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-214553-d73b53 · 生成时间: 2026-10-31T13:46:36.250038+00:00</p>
+<p>输入: $WORKSPACE\暴风星云裂\028.zip · SHA256: 48d6ce05cb08135a9f125237dab9970746dff5e4ee8a3d4ccf3864c33a0226bb</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>1</b>findings</div>
+<div class="metric"><b>1</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总仅含 1 条已去重 finding：028.php 的路径穿越（CWE-22，high，rule 来源，带 POC），类型计数 path_traversal=1，with_poc=1，即当前唯一交付项 POC 齐全。最高危即该 high 级路径穿越，但需注意其证据来自规则命中，且 surface_notes 明确说明输入未提供 028.php 源码内容（仅路径/行数/大小），因此该 finding 的行级细节（line_end=7）无法在本上下文中二次核对，POC 属静态/规则推导性质，未经动态验证。其余注入类（command_injection、xss、本地文件包含）与配置类（weak_hash、weak_random、insecure_cookie、weak_crypto、trust_boundary）均无 finding 交付，属覆盖缺口而非已排除。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-high'>high</span></td><td><code>path_traversal</code></td><td>028.php 路径穿越导致任意文件包含/读取（CWE-22）</td><td><code>028.php:7</code></td><td>0.66</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-54805d73cd84'><h2>F-1 028.php 路径穿越导致任意文件包含/读取（CWE-22）</h2><p><span class='sev sev-high'>high</span> <code>path_traversal</code> / CWE-22 · 置信度 0.66 · candidate / externally_corroborated</p><p><b>位置：</b><code>028.php:5-7</code></p><p>028.php:4 从 HTTP 查询参数 `page` 读取外部输入并赋给变量 `$file`，随后在 028.php:7 使用 `fnmatch(&quot;file*&quot;, $file)` 与 `$file != &quot;include.php&quot;` 作为唯一的准入校验。该校验基于文件名模式匹配而非路径规范化：`fnmatch` 只匹配字符串形态，不解析 `../`、绝对路径、URL 编码或空字节等路径语义，因此攻击者可通过 `page` 传入形如 `file/../../etc/passwd`、`file/../../../../var/www/config.php` 等以 `file` 开头但包含目录回溯序列的值，既满足 `fnmatch(&quot;file*&quot;)` 前缀条件，又使后续文件操作解析到预期目录之外。校验未使用 `realpath()`/`basename()` 做规范化，也未将结果限制在固定白名单目录内，属于典型的黑名单/模式匹配式路径校验失效。</p><p><b>影响：</b>攻击者可读取 Web 进程权限可访问的任意文件（配置文件、数据库凭据、源码、/etc/passwd 等），造成敏感信息泄露；若该 `$file` 后续被用于 include/require 或文件写入，则可进一步升级为本地文件包含导致 RCE 或任意文件写入/覆盖。具体危险操作位于 028.php:7 之后的文件处理逻辑，输入片段未给出该行之后的代码，故最终汇点函数名证据不足。</p><p><b>CVE/CWE 论证：</b>CWE-22（Improper Limitation of a Pathname to a Restricted Directory，路径穿越）。外部可达性：入口为 HTTP query 参数 `page`（028.php:4），无需认证即可触达；利用链闭合：`page` → `$file` → `fnmatch(&quot;file*&quot;)` 模式校验（可被 `file/../..` 形式绕过）→ 文件路径汇点（028.php:7 及其后续文件操作）。校验仅做字符串前缀匹配，未做规范化与目录约束，因此不构成有效防护。</p><p><b>修复建议：</b>1) 不要用 `fnmatch`/字符串比较做路径安全校验；2) 使用 `realpath()` 规范化后与允许的基目录做前缀比较（`str_starts_with(realpath($path), realpath($baseDir) . DIRECTORY_SEPARATOR)`）；3) 采用白名单映射（如 `[&#x27;home&#x27;=&gt;&#x27;home.php&#x27;,&#x27;about&#x27;=&gt;&#x27;about.php&#x27;]`），只接受固定键而非任意文件名；4) 用 `basename()` 剥离目录成分，拒绝包含 `..`、绝对路径、空字节的输入；5) 文件操作遵循最小权限，Web 进程不应能读取配置与系统文件。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>028.php:4</code></td><td>从 query `page` 读取外部输入</td><td>污点进入 file</td><td></td></tr><tr><td>2</td><td><code>028.php:7</code></td><td>危险汇点：if( !fnmatch( &quot;file*&quot;, $file ) &amp;&amp; $file != &quot;include.php&quot; ) {</td><td>污点进入 path_traversal 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /028（GET）的 路径穿越 / 任意文件读写 POC。注入点：GET 参数 page；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/028&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 路径穿越 / 任意文件读写 载荷</b><pre>curl -sS -i -X GET &#x27;http://TARGET:8080/028?page=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN54805.txt&#x27;</pre><div class='muted'>预期：响应出现目标文件路径；若为写操作，TARGET 上出现 testfiles 目录之外的文件；若为读操作，响应包含文件内容。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X GET &#x27;http://TARGET:8080/028?page=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN54805.txt&#x27;
+</pre><h4>request.http</h4><pre>GET /028 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 50
+
+page=..%2F..%2F..%2F..%2Ftmp%2Fsunset_GEN54805.txt
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.5.0-ver5",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/weak_crypto",
+              "name": "弱加密算法",
+              "shortDescription": {
+                "text": "弱加密算法（CWE-327）"
+              },
+              "fullDescription": {
+                "text": "弱加密算法"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/327.html",
+              "properties": {
+                "tags": [
+                  "weak_crypto",
+                  "CWE-327",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-31T13:44:08.319847+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/weak_crypto",
+          "level": "error",
+          "message": {
+            "text": "018.php 会话令牌使用 AES-128-ECB 且硬编码密钥，可被篡改伪造 admin 身份\n\n脚本用 openssl_decrypt($ciphertext,'aes-128-ecb',$key,OPENSSL_PKCS1_PADDING) 解密客户端提交的 token，密钥硬编码为 \"ik ben een aardbei\"（018.php:10）。AES-ECB 无 IV、按 16 字节块独立加密，相同明文块产生相同密文块，攻击者可在不知道密钥的情况下对已捕获的 token 做块级拼接/重排（ECB cut-and-paste），把 \"Sweep (user)\" 令牌中的 level 字段块替换为 admin 块，构造出 user=sweep、level=admin 的合法令牌，从而通过 018.php:32 的身份判断获得管理员权限。根因是弱加密模式（CWE-327）叠加硬编码密钥（CWE-321），而非单纯认证逻辑缺陷。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "018.php"
+                },
+                "region": {
+                  "startLine": 2,
+                  "endLine": 32
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-86c6c58e13d2"
+          },
+          "properties": {
+            "finding_id": "LLM-86c6c58e13d2",
+            "confidence": 0.8,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-327",
+            "endpoint": "/018.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/weak_crypto",
+          "level": "warning",
+          "message": {
+            "text": "018.php 使用 AES-128-ECB 模式进行解密（CWE-327 弱加密算法）\n\n在 018.php 第 2 行定义的 decrypt($ciphertext, $key) 函数中，第 3 行调用 openssl_decrypt($ciphertext, 'aes-128-ecb', $key, OPENSSL_PKCS1_PADDING)。攻击者可控的输入是传入该函数的 $ciphertext（密文）与 $key（密钥）参数，二者经函数参数直接进入 openssl_decrypt 的算法选择参数。算法字符串被硬编码为 'aes-128-ecb'，即 AES 的 ECB（电子密码本）分组模式：每个 16 字节分组独立加密/解密，不使用 IV，相同明文分组产生相同密文分组，且分组可被重排、拼接、删除而不被检测。代码中不存在任何完整性校验（无 MAC/HMAC、无 AEAD），因此校验环节缺失，无法发现密文被篡改或分组被替换。最终危险操作是第 3 行的 openssl_decrypt 以 ECB 模式解出明文，返回值在第 4 行仅做 === false 判断，未做任何认证性验证。此外第 3 行第 4 个参数使用 OPENSSL_PKCS1_PADDING（该常量语义上属于 RSA 填充，用于 openssl_decrypt 的对称解密选项并不正确，实际应使用 OPENSSL_RAW_DATA/OPENSSL_ZERO_PADDING 语义），进一步说明填充处理未按对称加密规范配置。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "018.php"
+                },
+                "region": {
+                  "startLine": 2,
+                  "endLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-1f3cfc0b6797"
+          },
+          "properties": {
+            "finding_id": "SEM-1f3cfc0b6797",
+            "confidence": 0.81,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-327",
+            "endpoint": "/018",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

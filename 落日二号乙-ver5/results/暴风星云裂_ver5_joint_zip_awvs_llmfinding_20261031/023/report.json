@@ -1,0 +1,1304 @@
+{
+  "schema_version": "1.0",
+  "generator": {
+    "name": "落日二号乙 / Sunset Two Beta",
+    "version": "1.5.0-ver5"
+  },
+  "run": {
+    "run_id": "20261031-214417-35d923",
+    "generated_at": "2026-10-31T13:45:27.592316+00:00",
+    "input_mode": "zip",
+    "target_url": "",
+    "zip_path": "C:\\Users\\liyuf\\Desktop\\794\\暴风星云裂\\023.zip",
+    "zip_sha256": "aada7600a62949bf4930c902cfe7f7a69ee803e85804c9c7ea164d938a3b0b7a",
+    "duration_sec": 69.9
+  },
+  "project": {
+    "file_count": 1,
+    "text_file_count": 1,
+    "languages": {
+      "php": 1
+    },
+    "frameworks": [],
+    "endpoint_count": 0,
+    "endpoints": [],
+    "files": [
+      {
+        "path": "023.php",
+        "language": "php",
+        "lines": 30,
+        "size": 1249
+      }
+    ]
+  },
+  "summary": {
+    "text": "本次汇总基于 6 条已去重 findings，全部集中在单文件 PHP 脚本 023.php（约 30 行），无框架、无路由清单。最高危为 GEN-2fcabc51c287（sql_injection，critical，023.php 第 17 行附近的口令修改逻辑），其次为 LLM-fb8cc628a9b1（csrf，high，可跨站强制改密导致账户接管）与 SEM-e5f2216eebb4（brute_force，high，口令修改流程缺少速率限制/失败锁定）。另有 3 条 medium：SEM-de6429df0eff 与 LLM-3fa1c975a8fc 实为同一问题（无盐 MD5 存储口令，CWE-328，应归为 weak_hash，SEM 条目类型标注为 weak_crypto 属类型串用，需人工归并），以及 SEM-b5cfc3d8dbaa（csrf，medium，与 high 级 CSRF 条目同源，属重复降级）。6 条均标记 has_poc=true，但其中 weak_hash/weak_crypto 两条只有静态证据 POC（代码/算法层面），不能宣称可动态复现；sql_injection、csrf、brute_force 三条为 HTTP 语义 POC，同样仅为文本工件，未执行、未动态验证。",
+    "total_findings": 6,
+    "with_poc": 6,
+    "by_severity": {
+      "critical": 1,
+      "high": 2,
+      "medium": 3
+    },
+    "by_verdict": {
+      "candidate": 6
+    },
+    "by_evidence_level": {
+      "rule_verified+llm": 4,
+      "llm_inferred": 2
+    },
+    "by_origin": {
+      "rule": 4,
+      "llm_finding": 2
+    },
+    "second_order": 0,
+    "injection_signals": 0,
+    "quarantined_files": []
+  },
+  "findings": [
+    {
+      "id": "GEN-2fcabc51c287",
+      "title": "023.php 口令修改处 SQL 注入（CWE-89）",
+      "vulnerability_type": "sql_injection",
+      "cwe": "CWE-89",
+      "cwe_name": "SQL 注入",
+      "severity": "critical",
+      "cvss_estimate": 9.8,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.4,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "023.php",
+        "line_start": 15,
+        "line_end": 17,
+        "endpoint": "/023",
+        "http_method": "GET"
+      },
+      "source": "query `password_new`（023.php:5）",
+      "sink": "023.php:17 $result = mysqli_query($GLOBALS[\"___mysqli_ston\"],  $insert ) or die( '<pre>' . ((is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_error($GLOBALS[\"___mysqli_ston\"]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . '</pre>' );",
+      "description": "攻击者通过 GET 参数 password_new（023.php:5 `$pass_new = $_GET['password_new'];`）提交输入，与 password_conf 一起进入口令修改流程。023.php:11 仅用 mysqli_real_escape_string 处理 $pass_new，随后 023.php:12 对其做 md5()，因此进入 SQL 的值是 32 位十六进制串，单引号等元字符已被 md5 归一化，无法从 password_new 直接闭合 023.php:16 中 `password = '$pass_new'` 的引号。真正未经过滤拼接的是 023.php:16 的 `$current_user`（来自 dvwaCurrentUser()，023.php:15），它被直接拼进 `WHERE user = '...'`，最终在 023.php:17 由 mysqli_query 执行。因此候选标注的 source（password_new）与 sink 之间的污点链在源码层面并不闭合：password_new 经 md5 后不具备注入能力；可利用点取决于 dvwaCurrentUser() 的返回值是否可被外部影响（该函数定义不在本次 code_pack 中，证据不足）。",
+      "impact": "若 $current_user 可被攻击者影响，则可篡改 UPDATE 语句的 WHERE 条件，批量改写 users 表中任意用户口令，导致账户接管；若仅 password_new 可控，则实际影响为口令被 md5 后写入，不构成 SQL 注入。当前证据下无法确认可利用性。",
+      "cve_justification": "CWE-89：SQL 命令中特殊元素未正确中和。外部可达性成立（GET 参数、无需认证即可到达 023.php 的修改逻辑，认证条件取决于 DVWA 会话配置）；但利用链未闭合——password_new 经 md5() 后无法注入，唯一未净化拼接点为 $current_user，其可控性证据不足，故不满足 CVE 级论证。",
+      "suggestion": "对 023.php:16 的 UPDATE 使用预处理语句并绑定参数（mysqli_prepare + bind_param），不要字符串拼接 $current_user；对 $current_user 做白名单校验（仅允许已登录会话中的用户名，且与 session 中的身份比对）；口令哈希改用 password_hash()/password_verify()（PASSWORD_DEFAULT），不要用 md5；同时移除 023.php:17 中把 mysqli_error 直接回显到页面的 die() 分支，避免报错信息泄露。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "023.php:5",
+          "description": "从 query `password_new` 读取外部输入",
+          "data_state": "污点进入 insert",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "023.php:17",
+          "description": "危险汇点：$result = mysqli_query($GLOBALS[\"___mysqli_ston\"],  $insert ) or die( '<pre>' . ((is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_error($GLOBALS[\"___mysqli_ston\"]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . '</pre>' );",
+          "data_state": "污点进入 sql_injection 汇点",
+          "bypass_reason": "未发现有效净化/参数化"
+        }
+      ],
+      "poc": {
+        "description": "针对 /023（GET）的 SQL 注入 POC。注入点：GET 参数 password_new；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /023 使用 GET",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/023'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 SQL 注入 载荷",
+            "request": "curl -sS -i -X GET 'http://TARGET:8080/023?password_new=%27%20OR%20%271%27%3D%271&Submit=Submit'",
+            "expected_response": "布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "' OR '1'='1",
+        "impact": "攻击者可绕过认证或读取/篡改数据库内容，导致账户接管与数据泄露。",
+        "cve_justification": "符合 CWE-89。漏洞位于可交付代码 023.php:17，外部输入来自 query `password_new`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X GET 'http://TARGET:8080/023?password_new=%27%20OR%20%271%27%3D%271&Submit=Submit'\n",
+          "request.http": "GET /023 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 52\r\n\r\npassword_new=%27%20OR%20%271%27%3D%271&Submit=Submit\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/023",
+              "method": "GET"
+            }
+          }
+        },
+        "artifact_dir": "poc/GEN-2fcabc51c287"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 GET /023；source=query/password_new；sink=023.php:17；规则 php-sql。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：入口：GET password_new / password_conf（023.php:5-6）→ 023.php:11 mysqli_real_escape_string → 023.php:12 md5() 归一化为 32 位十六进制 → 023.php:16 拼入 `SET password = '$pass_new'`（此处已无注入能力）；另一路 dvwaCurrentUser()（023.php:15）未经处理拼入 `WHERE user = '...'` → 023.php:17 mysqli_query 执行。结论：候选给出的 password_new→sink 链在 md5 处断开，需补充 dvwaCurrentUser() 的实现才能判定是否构成真实注入。\nPocWriter 建议（未采纳，缺少端点 /023）：针对 023.php 的 SQL 注入 POC。源码 023.php:17 将 GET 参数 password_new 直接拼入 SQL 语句，未做参数化处理。payload 使用 TARGET 占位符，仅限授权测试。\nPocWriter 建议（未采纳，缺少端点 /023）：符合 CWE-89。漏洞位于 023.php:17，外部输入来自 GET 参数 password_new，source→sink 链静态闭合，未见有效净化。\nPOC 备注：POC 仅为文本工件，不执行、不联网。目标统一使用 TARGET 占位符，仅限授权测试。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "sql_injection",
+        "CWE-89",
+        "critical",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "LLM-fb8cc628a9b1",
+      "title": "DVWA 密码修改功能（023.php）缺少 CSRF token，可被跨站强制修改受害者密码导致账户接管",
+      "vulnerability_type": "csrf",
+      "cwe": "CWE-352",
+      "cwe_name": "跨站请求伪造",
+      "severity": "high",
+      "cvss_estimate": 8.1,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.82,
+      "verdict": "candidate",
+      "evidence_level": "llm_inferred",
+      "origin": "llm_finding",
+      "needs_verification": true,
+      "location": {
+        "file": "023.php",
+        "line_start": 3,
+        "line_end": 17,
+        "endpoint": "/023.php",
+        "http_method": "GET"
+      },
+      "source": "query `password_new`（023.php:5-6）",
+      "sink": "023.php:17 第 16-17 行拼接 UPDATE users SET password 并 mysqli_query 执行，修改当前会话用户密码",
+      "description": "023.php 在 `$_GET['Change']` 存在时直接读取 `password_new` 与 `password_conf`，仅校验两者相等（第 9 行），随后经 mysqli_real_escape_string + md5 后拼入 UPDATE 语句（第 16-17 行）修改当前登录用户密码。整个流程没有任何 CSRF token、Referer 校验、原密码确认或二次认证，且接受 GET 请求，因此攻击者只需诱导已登录受害者访问一个携带 `Change=Change&password_new=X&password_conf=X` 的链接/图片即可把受害者密码改为攻击者已知值，进而接管账户。",
+      "impact": "任意已登录用户的密码可被跨站静默修改，导致账户接管；若受害者是管理员则进一步扩大影响。",
+      "cve_justification": "CWE-352 跨站请求伪造：外部可触发、无需攻击者认证、仅依赖受害者会话，链完整闭合。",
+      "suggestion": "为密码修改表单加入随机 CSRF token 并在服务端校验；改用 POST；要求输入原密码或二次认证；校验 Referer/Origin。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "023.php:3",
+          "description": "检测到 $_GET['Change'] 即进入密码修改分支，无任何来源/令牌校验",
+          "data_state": "攻击者可控的 GET 请求",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "023.php:5-6",
+          "description": "读取 password_new / password_conf",
+          "data_state": "攻击者指定新密码明文",
+          "bypass_reason": ""
+        },
+        {
+          "step": 3,
+          "location": "023.php:9",
+          "description": "仅比较两次输入是否相等，无原密码/CSRF token 校验",
+          "data_state": "两值相等即通过",
+          "bypass_reason": ""
+        },
+        {
+          "step": 4,
+          "location": "023.php:15-17",
+          "description": "取当前登录用户并执行 UPDATE 修改其密码",
+          "data_state": "md5 后的新密码写入数据库",
+          "bypass_reason": "无 CSRF token、无 Referer 校验、接受 GET，跨站可触发"
+        }
+      ],
+      "poc": {
+        "description": "针对 /023.php（GET）的 跨站请求伪造 POC。注入点：GET 参数 Change；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /023.php 使用 GET",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/023.php'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 跨站请求伪造 载荷",
+            "request": "curl -sS -i -X GET 'http://TARGET:8080/023.php?Change=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW'",
+            "expected_response": "状态改变请求被接受或进入下一步流程"
+          },
+          {
+            "step": 3,
+            "action": "读取账户状态/重新登录确认状态确实改变",
+            "request": "",
+            "expected_response": "密码或业务状态已改变；请求无需 CSRF token/有效验证码"
+          }
+        ],
+        "payload": "自动提交表单（见 poc.html）",
+        "impact": "攻击者可诱导已登录用户修改密码，导致账户接管。",
+        "cve_justification": "符合 CWE-352。漏洞位于可交付代码 023.php:17，外部输入来自 query `password_new`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X GET 'http://TARGET:8080/023.php?Change=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW'\n",
+          "request.http": "GET /023.php HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 62\r\n\r\nChange=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/023.php",
+              "method": "GET"
+            }
+          }
+        },
+        "artifact_dir": "poc/LLM-fb8cc628a9b1"
+      },
+      "external_evidence": [],
+      "verification_notes": "需确认部署中 DVWA 会话 Cookie 的 SameSite 设置；若为 Lax/Strict 则跨站 GET 携带 Cookie 受限，需改用顶层导航或 POST 场景验证。\n模型 POC 要点：构造一个自动发起 GET 请求的页面/图片，诱导已登录 DVWA 的受害者访问，将其密码改为攻击者已知值。\nLLM 深挖（AutoCVE Finding 风格）：单次调用、无工具；文件与行号已校验，代码片段由真实源码回填。\nPocWriter 建议（未采纳，缺少端点 /023.php）：针对 023.php 的 CSRF POC。修改密码操作通过 GET 请求完成，参数为 Change、password_new、password_conf，无 CSRF token 校验，可被跨站诱导触发。\nPocWriter 建议（未采纳，缺少端点 /023.php）：符合 CWE-352。023.php:17 处理修改密码逻辑，无 token 校验，状态改变请求可被跨站伪造。\nPOC 备注：需受害者已登录会话；POC 为文本，不执行。目标使用 TARGET 占位符，仅限授权测试。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "csrf",
+        "CWE-352",
+        "high",
+        "llm_finding",
+        "llm_inferred"
+      ]
+    },
+    {
+      "id": "SEM-e5f2216eebb4",
+      "title": "023.php 口令修改流程缺少速率限制/失败锁定（CWE-307）",
+      "vulnerability_type": "brute_force",
+      "cwe": "CWE-307",
+      "cwe_name": "暴力破解防护缺失",
+      "severity": "high",
+      "cvss_estimate": 8.1,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.4,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "023.php",
+        "line_start": 4,
+        "line_end": 5,
+        "endpoint": "/023",
+        "http_method": "GET"
+      },
+      "source": "query `Login`（023.php）",
+      "sink": "023.php:5 \t$pass_new  = $_GET[ 'password_new' ];",
+      "description": "候选将 023.php:4-5 标注为登录流程并称缺少失败计数与锁定。但源码片段显示 023.php:5-6 读取的是 password_new / password_conf，属于口令修改（change password）功能，并非登录认证；该文件中未见用户名/口令校验逻辑，也未见失败计数、锁定或速率限制代码。由于 code_pack 未包含登录处理文件与 dvwaCurrentUser() 实现，无法确认是否存在独立的登录接口及其防护状态。因此「暴力破解防护缺失」在本文件范围内证据不足，且候选的 source 标注（query `Login`）与源码不符。",
+      "impact": "证据不足：若确无速率限制，攻击者可对认证接口进行在线口令猜测；但在 023.php 中未观察到认证校验点，无法据此认定可利用。",
+      "cve_justification": "CWE-307：证据不足。023.php 片段中不存在登录认证逻辑，无法证明失败计数/锁定缺失；需补充登录处理文件与认证中间件代码后才能论证外部可达性与利用链闭合。",
+      "suggestion": "在认证入口统一实施失败计数与指数退避、账户/IP 维度限流、验证码或 MFA；记录并告警异常登录；口令修改接口要求原口令校验。上述措施需落到实际登录处理文件中（本次未提供）。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "023.php:5",
+          "description": "登录流程未见失败计数、锁定或速率限制；需授权环境重复请求确认",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "针对 /023（GET）的 暴力破解防护缺失 POC。注入点：GET 参数 password_new；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /023 使用 GET",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/023'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送第一次错误登录请求并记录状态、延迟和响应",
+            "request": "curl -sS -i -X GET 'http://TARGET:8080/023?Login=Login&username=admin&password=wrong'",
+            "expected_response": "登录失败响应"
+          },
+          {
+            "step": 3,
+            "action": "在短时间内重复 5 次以上错误登录",
+            "request": "curl -sS -i -X GET 'http://TARGET:8080/023?Login=Login&username=admin&password=wrong'",
+            "expected_response": "无锁定、无速率限制、无递增延迟或验证码触发"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "攻击者可无限次尝试口令，导致账户被暴力破解。",
+        "cve_justification": "符合 CWE-307。漏洞位于可交付代码 023.php:5，外部输入来自 query `Login`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X GET 'http://TARGET:8080/023?Login=Login&username=admin&password=wrong'\n",
+          "request.http": "GET /023 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 41\r\n\r\nLogin=Login&username=admin&password=wrong\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/023",
+              "method": "GET"
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-e5f2216eebb4"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 GET /023；source=query/Login；sink=023.php:5；规则 php-login-no-throttle。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：候选声称：攻击者重复请求 023.php:5 的 Login 参数进行口令猜测。实际源码 023.php:5 为 `$_GET['password_new']`，属口令修改参数，非登录凭据；链条在源码层面不成立，需补充真实登录端点证据。\nPocWriter 建议（未采纳，缺少端点 /023）：针对 023.php 的暴力破解防护缺失 POC（源码 023.php:5 附近处理 Login 参数）。登录接口无锁定/速率限制/验证码。\nPocWriter 建议（未采纳，缺少端点 /023）：符合 CWE-307。023.php:5 处理 Login 参数，无速率限制/锁定机制。\nPOC 备注：POC 为文本，不执行；目标使用 TARGET 占位符，仅限授权测试。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "brute_force",
+        "CWE-307",
+        "high",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "SEM-de6429df0eff",
+      "title": "023.php 使用 MD5 存储口令（CWE-328 弱哈希）",
+      "vulnerability_type": "weak_crypto",
+      "cwe": "CWE-327",
+      "cwe_name": "弱加密算法",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.8,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "023.php",
+        "line_start": 11,
+        "line_end": 12,
+        "endpoint": "/023",
+        "http_method": "GET"
+      },
+      "source": "repository `md5(`（023.php）",
+      "sink": "023.php:12 \t\t$pass_new = md5( $pass_new );",
+      "description": "023.php:12 `$pass_new = md5( $pass_new );` 对口令使用 MD5 做无盐单轮哈希，随后在 023.php:16-17 写入 users 表 password 字段。MD5 计算极快且无盐，攻击者一旦获取数据库（如通过备份泄露、SQL 注入或数据库直连），可用 GPU/彩虹表在极短时间内还原常见口令；相同口令产生相同哈希，也便于横向比对。注意：该问题本质是弱哈希（CWE-328），不是弱加密算法（CWE-327）。",
+      "impact": "数据库泄露后口令可被快速离线爆破还原，导致用户账户接管；相同口令哈希一致，泄露用户间口令复用关系。属于配置/实现型弱点，无需 HTTP 污点链即可成立。",
+      "cve_justification": "CWE-328（Use of Weak Hash）：MD5 用于口令这一安全用途，算法本身不具备口令哈希所需的慢速与加盐特性。外部可达性：任何能触发口令修改的请求都会写入 MD5 值；无需特殊权限即可观察到该实现（源码级）。利用链为「数据库读取 → 离线爆破 → 账户接管」，闭合性依赖数据库泄露前提。",
+      "suggestion": "改用 password_hash($pass_new, PASSWORD_DEFAULT)（bcrypt/Argon2id）生成带盐慢哈希，校验用 password_verify()；迁移期可对存量 MD5 值在用户下次登录成功后透明重哈希；禁止在任何新代码中使用 md5()/sha1() 处理口令或令牌。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "023.php:12",
+          "description": "弱算法/模式或可预测令牌是根因；需确认保护对象与可伪造性",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "静态证据型 POC：023.php:12 使用 md5() 对密码做哈希，属弱哈希算法（CWE-328），无需发送请求，仅源码审查。",
+        "preconditions": [
+          "可读取源码"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "在源码中定位证据",
+            "request": "grep -n -A2 -B2 '<evidence>' 023.php",
+            "expected_response": "命中硬编码凭据/弱算法/弱随机数调用"
+          },
+          {
+            "step": 2,
+            "action": "人工确认凭据有效性或算法使用场景",
+            "request": "（离线审查）",
+            "expected_response": "确认凭据仍有效或算法保护敏感数据"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "密码以无盐 MD5 存储，泄露后易被离线破解，导致账户接管。",
+        "cve_justification": "符合 CWE-328（弱哈希），非 CWE-327。证据位于 023.php:12。",
+        "scripts": {
+          "poc_readme.md": "# 静态证据\n\n- 文件: 023.php\n- 行号: 12\n- 片段:\n```\n11: \t\t$pass_new = ((isset($GLOBALS[\"___mysqli_ston\"]) && is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_real_escape_string($GLOBALS[\"___mysqli_ston\"],  $pass_new ) : ((trigger_error(\"[MySQLConverterToo] Fix the mysql_escape_string() call! This code does not work.\", E_USER_ERROR)) ? \"\" : \"\"));\n12: \t\t$pass_new = md5( $pass_new );\n13: \n```\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": false,
+          "warnings": [
+            "POC 未使用 TARGET 占位符，请人工检查目标地址"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "not_executable",
+            "errors": [],
+            "warnings": [],
+            "checks": {
+              "static_only": true,
+              "executed": false
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-de6429df0eff"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 GET /023；source=repository/md5(；sink=023.php:12；规则 php-weak-crypto。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：入口：GET password_new（023.php:5）→ 023.php:11 mysqli_real_escape_string → 023.php:12 md5() 生成无盐哈希 → 023.php:16-17 写入 users.password。根因在 023.php:12 的算法选择，与输入是否被转义无关。\nPOC 备注：纯静态证据，无网络请求；POC 为文本，不执行。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "weak_crypto",
+        "CWE-327",
+        "medium",
+        "rule",
+        "rule_verified+llm"
+      ]
+    },
+    {
+      "id": "LLM-3fa1c975a8fc",
+      "title": "023.php 使用无盐 MD5 存储用户密码（CWE-328）",
+      "vulnerability_type": "weak_hash",
+      "cwe": "CWE-328",
+      "cwe_name": "弱哈希算法",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.8,
+      "verdict": "candidate",
+      "evidence_level": "llm_inferred",
+      "origin": "llm_finding",
+      "needs_verification": true,
+      "location": {
+        "file": "023.php",
+        "line_start": 12,
+        "line_end": 17,
+        "endpoint": "/023.php",
+        "http_method": "GET"
+      },
+      "source": "query `password_new`（023.php:5）",
+      "sink": "023.php:17 第 16-17 行将 MD5 哈希写入 users.password",
+      "description": "第 12 行对用户新密码仅做 `md5($pass_new)` 后直接写入数据库（第 16-17 行），未使用盐值或慢哈希（bcrypt/argon2）。MD5 计算极快且无盐，一旦数据库泄露可通过彩虹表/暴力快速还原明文，且相同密码产生相同哈希，便于批量破解。",
+      "impact": "数据库泄露后用户密码可被快速破解，导致账户接管与撞库扩散。",
+      "cve_justification": "CWE-328 弱哈希：无盐 MD5 用于密码存储，属可申报的实现缺陷。",
+      "suggestion": "改用 password_hash()（bcrypt/argon2）并配合 password_verify()，为每个密码使用独立盐。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "023.php:5",
+          "description": "读取用户新密码",
+          "data_state": "明文密码",
+          "bypass_reason": ""
+        },
+        {
+          "step": 2,
+          "location": "023.php:12",
+          "description": "无盐 MD5 哈希",
+          "data_state": "32 位 MD5 十六进制",
+          "bypass_reason": ""
+        },
+        {
+          "step": 3,
+          "location": "023.php:16-17",
+          "description": "写入数据库",
+          "data_state": "弱哈希持久化",
+          "bypass_reason": ""
+        }
+      ],
+      "poc": {
+        "description": "针对 /023.php（GET）的 弱哈希算法 POC。注入点：GET 参数 password_new；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /023.php 使用 GET",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/023.php'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 弱哈希算法 载荷",
+            "request": "curl -sS -i -X GET 'http://TARGET:8080/023.php?password_new=SUNSET_PROBE'",
+            "expected_response": "按漏洞类型观察相应的异常响应/副作用。"
+          },
+          {
+            "step": 3,
+            "action": "记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道",
+            "request": "",
+            "expected_response": "出现与基线不同的内容、状态码、延迟或副作用"
+          }
+        ],
+        "payload": "SUNSET_PROBE",
+        "impact": "弱哈希使密码泄露后易被破解，削弱认证安全性。",
+        "cve_justification": "符合 CWE-328。漏洞位于可交付代码 023.php:17，外部输入来自 query `password_new`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X GET 'http://TARGET:8080/023.php?password_new=SUNSET_PROBE'\n",
+          "request.http": "GET /023.php HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 25\r\n\r\npassword_new=SUNSET_PROBE\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/023.php",
+              "method": "GET"
+            }
+          }
+        },
+        "artifact_dir": "poc/LLM-3fa1c975a8fc"
+      },
+      "external_evidence": [],
+      "verification_notes": "需确认数据库中 password 字段确为 MD5 存储（DVWA 默认如此），以及是否存在其他加盐层。\n模型 POC 要点：该问题为存储实现缺陷，无直接远程利用请求；演示哈希可被快速还原。\nLLM 深挖（AutoCVE Finding 风格）：单次调用、无工具；文件与行号已校验，代码片段由真实源码回填。\nPocWriter 建议（未采纳，缺少端点 /023.php）：针对 023.php 的弱哈希 POC。023.php:12 使用 md5() 处理 password_new，属弱哈希（CWE-328）。通过提交密码并观察存储/比对行为佐证。\nPocWriter 建议（未采纳，缺少端点 /023.php）：符合 CWE-328。证据位于 023.php:12 的 md5() 调用。\nPOC 备注：POC 为文本，不执行；目标使用 TARGET 占位符，仅限授权测试。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "weak_hash",
+        "CWE-328",
+        "medium",
+        "llm_finding",
+        "llm_inferred"
+      ]
+    },
+    {
+      "id": "SEM-b5cfc3d8dbaa",
+      "title": "023.php 口令修改接口缺少 CSRF 防护（CWE-352）",
+      "vulnerability_type": "csrf",
+      "cwe": "CWE-352",
+      "cwe_name": "跨站请求伪造",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "cvss_note": "按严重度给出的粗略估计，不是正式 CVSS 评分。",
+      "confidence": 0.7,
+      "verdict": "candidate",
+      "evidence_level": "rule_verified+llm",
+      "origin": "rule",
+      "needs_verification": true,
+      "location": {
+        "file": "023.php",
+        "line_start": 4,
+        "line_end": 5,
+        "endpoint": "/023",
+        "http_method": "GET"
+      },
+      "source": "query `Change`（023.php）",
+      "sink": "023.php:5 \t$pass_new  = $_GET[ 'password_new' ];",
+      "description": "023.php:4-6 通过 GET 读取 password_new / password_conf 并直接进入口令修改流程，023.php:16-17 执行 UPDATE users SET password。整个流程未见 CSRF token 校验、Origin/Referer 校验，也未要求重新输入原口令。攻击者可构造 `<img src=\"http://TARGET/023.php?password_new=attacker&password_conf=attacker\">` 诱导已登录受害者访问，从而在受害者会话下把其口令改为攻击者已知值。使用 GET 触发状态变更进一步放大了风险（可被图片标签、预取、日志回放触发）。",
+      "impact": "已登录用户的账户口令被静默篡改，攻击者随后用新口令登录，实现账户接管；若受害者是高权限账户，则导致权限提升。",
+      "cve_justification": "CWE-352：状态改变请求缺少不可预测令牌与来源校验。外部可达性成立（任意第三方页面可发起跨站 GET）；无需认证即可投递请求，但需受害者处于已登录会话中，利用链为「诱导访问 → 会话携带 Cookie → 口令被改」，闭合。",
+      "suggestion": "将口令修改改为 POST；在表单中引入每会话随机 CSRF token 并在服务端比对（hash_equals）；校验 Origin/Referer 与站点一致；为会话 Cookie 设置 SameSite=Lax/Strict；修改口令前要求输入当前口令做二次确认。",
+      "exploit_chain": [
+        {
+          "step": 1,
+          "location": "023.php:5",
+          "description": "状态改变请求未见 CSRF token/Origin 校验；需复核认证与 SameSite 条件",
+          "data_state": "语义模式命中",
+          "bypass_reason": "需按 notes 中的运行时/跨文件条件复核"
+        }
+      ],
+      "poc": {
+        "description": "针对 /023（GET）的 跨站请求伪造 POC。注入点：GET 参数 password_new；payload 使用 TARGET 占位符。",
+        "preconditions": [
+          "目标应用已部署且路由可达",
+          "入口 /023 使用 GET",
+          "测试已获得明确授权，且仅使用 TARGET 占位符"
+        ],
+        "steps": [
+          {
+            "step": 1,
+            "action": "确认目标可达且已获授权",
+            "request": "curl -sS -i 'http://TARGET:8080/023'",
+            "expected_response": "返回应用页面/接口响应，而不是连接失败"
+          },
+          {
+            "step": 2,
+            "action": "发送 跨站请求伪造 载荷",
+            "request": "curl -sS -i -X GET 'http://TARGET:8080/023?Change=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW'",
+            "expected_response": "状态改变请求被接受或进入下一步流程"
+          },
+          {
+            "step": 3,
+            "action": "读取账户状态/重新登录确认状态确实改变",
+            "request": "",
+            "expected_response": "密码或业务状态已改变；请求无需 CSRF token/有效验证码"
+          }
+        ],
+        "payload": "自动提交表单（见 poc.html）",
+        "impact": "攻击者可诱导已登录用户修改密码，导致账户接管。",
+        "cve_justification": "符合 CWE-352。漏洞位于可交付代码 023.php:5，外部输入来自 query `Change`，source→sink 链已静态闭合，且未发现有效净化；具备远程触发条件。",
+        "scripts": {
+          "poc.sh": "#!/usr/bin/env sh\nset -eu\n# 仅限授权测试；替换 TARGET 后手动执行\ncurl -sS -i -X GET 'http://TARGET:8080/023?Change=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW'\n",
+          "request.http": "GET /023 HTTP/1.1\r\nHost: TARGET:8080\r\nAccept: */*\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 62\r\n\r\nChange=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW\n"
+        },
+        "safety": {
+          "executed": false,
+          "network_egress": false,
+          "requires_authorization": true,
+          "target_uses_placeholder": true,
+          "warnings": [
+            "POC 叙述未明确标注 source→sink 注入点",
+            "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+          ],
+          "policy": "POC 仅为文本工件；管线不会执行、不会联网、不会搭建沙箱。",
+          "contract_validation": {
+            "status": "static_consistent",
+            "errors": [],
+            "warnings": [
+              "POC 叙述未明确标注 source→sink 注入点",
+              "原始 payload 未直接出现在请求文本中，可能经过 URL 编码"
+            ],
+            "checks": {
+              "static_only": false,
+              "executed": false,
+              "endpoint": "/023",
+              "method": "GET"
+            }
+          }
+        },
+        "artifact_dir": "poc/SEM-b5cfc3d8dbaa"
+      },
+      "external_evidence": [],
+      "verification_notes": "静态证据：入口 GET /023；source=query/Change；sink=023.php:5；规则 php-state-change-no-token。未执行 POC、未搭建沙箱；建议在授权环境人工复核。\n链叙事：攻击者页面构造指向 023.php?password_new=...&password_conf=... 的 GET 请求 → 受害者浏览器携带 DVWA 会话 Cookie 访问 023.php:5-6 → 023.php:16-17 执行 UPDATE 改写口令。缺少 token 与来源校验是链条成立的关键。\nPocWriter 建议（未采纳，缺少端点 /023）：针对 023.php 的 CSRF POC（源码 023.php:5 附近处理 Change 参数）。修改密码通过 GET 完成，无 token 校验。\nPocWriter 建议（未采纳，缺少端点 /023）：符合 CWE-352。023.php:5 处理 Change 参数，无 token 校验。\nPOC 备注：需受害者已登录会话；POC 为文本，不执行；目标使用 TARGET 占位符，仅限授权测试。",
+      "safety": {
+        "executed": false,
+        "requires_authorization": true
+      },
+      "tags": [
+        "csrf",
+        "CWE-352",
+        "medium",
+        "rule",
+        "rule_verified+llm"
+      ]
+    }
+  ],
+  "second_order": [],
+  "security": {
+    "scanned_files": 1,
+    "signal_count": 0,
+    "quarantined_files": [],
+    "by_category": {},
+    "signals": [],
+    "policy": "untrusted-data-envelope + file-allowlist + passive-poc"
+  },
+  "awvs": {
+    "role": "external_corroboration",
+    "note": "AWVS 是外部动态扫描器；本管线只做目标播种与结果回灌，不执行 AWVS 扫描。",
+    "imported": [],
+    "correlations": [],
+    "targets_file": "awvs/targets.json"
+  },
+  "coverage": {
+    "counts": {
+      "sql_injection": 1,
+      "csrf": 2,
+      "brute_force": 1,
+      "weak_crypto": 1,
+      "weak_hash": 1
+    },
+    "types": [
+      {
+        "type": "command_injection",
+        "label": "OS 命令注入",
+        "cwe": "CWE-78",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "sql_injection",
+        "label": "SQL 注入",
+        "cwe": "CWE-89",
+        "auto_cve": true,
+        "count": 1
+      },
+      {
+        "type": "blind_sql_injection",
+        "label": "盲 SQL 注入",
+        "cwe": "CWE-89",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "ssrf",
+        "label": "服务端请求伪造",
+        "cwe": "CWE-918",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "path_traversal",
+        "label": "路径穿越 / 任意文件读写",
+        "cwe": "CWE-22",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "deserialization",
+        "label": "不安全反序列化",
+        "cwe": "CWE-502",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "ssti",
+        "label": "服务端模板注入",
+        "cwe": "CWE-1336",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "auth_bypass",
+        "label": "认证绕过",
+        "cwe": "CWE-287",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "idor",
+        "label": "越权 / IDOR",
+        "cwe": "CWE-639",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "xxe",
+        "label": "XML 外部实体注入",
+        "cwe": "CWE-611",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "xss",
+        "label": "跨站脚本",
+        "cwe": "CWE-79",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "business_logic",
+        "label": "业务逻辑漏洞",
+        "cwe": "CWE-840",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "other",
+        "label": "其他高危问题",
+        "cwe": "CWE-693",
+        "auto_cve": true,
+        "count": 0
+      },
+      {
+        "type": "rce",
+        "label": "远程代码执行",
+        "cwe": "CWE-94",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "code_injection",
+        "label": "代码注入",
+        "cwe": "CWE-94",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "expression_injection",
+        "label": "表达式注入",
+        "cwe": "CWE-917",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "ldap_injection",
+        "label": "LDAP 注入",
+        "cwe": "CWE-90",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "xpath_injection",
+        "label": "XPath 注入",
+        "cwe": "CWE-643",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "open_redirect",
+        "label": "开放重定向",
+        "cwe": "CWE-601",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "csrf",
+        "label": "跨站请求伪造",
+        "cwe": "CWE-352",
+        "auto_cve": false,
+        "count": 2
+      },
+      {
+        "type": "file_upload",
+        "label": "不安全文件上传",
+        "cwe": "CWE-434",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "race_condition",
+        "label": "竞态条件",
+        "cwe": "CWE-367",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_crypto",
+        "label": "弱加密算法",
+        "cwe": "CWE-327",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "weak_hash",
+        "label": "弱哈希算法",
+        "cwe": "CWE-328",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "weak_random",
+        "label": "弱随机数",
+        "cwe": "CWE-330",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "hardcoded_secret",
+        "label": "硬编码凭据",
+        "cwe": "CWE-798",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "trust_boundary",
+        "label": "信任边界违规",
+        "cwe": "CWE-501",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "log_injection",
+        "label": "日志注入",
+        "cwe": "CWE-117",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "insecure_cookie",
+        "label": "不安全 Cookie",
+        "cwe": "CWE-614",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "information_disclosure",
+        "label": "信息泄露",
+        "cwe": "CWE-200",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "api_info_disclosure",
+        "label": "API 信息泄露",
+        "cwe": "CWE-200",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "captcha_bypass",
+        "label": "验证码绕过",
+        "cwe": "CWE-804",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "csp",
+        "label": "CSP 配置缺陷",
+        "cwe": "CWE-693",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "weak_id",
+        "label": "弱 ID / 可预测会话标识",
+        "cwe": "CWE-330",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "client_side_validation",
+        "label": "客户端校验绕过",
+        "cwe": "CWE-602",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "brute_force",
+        "label": "暴力破解防护缺失",
+        "cwe": "CWE-307",
+        "auto_cve": false,
+        "count": 1
+      },
+      {
+        "type": "second_order_injection",
+        "label": "二次注入",
+        "cwe": "CWE-89",
+        "auto_cve": false,
+        "count": 0
+      },
+      {
+        "type": "prompt_injection",
+        "label": "LLM Prompt 注入",
+        "cwe": "CWE-1426",
+        "auto_cve": false,
+        "count": 0
+      }
+    ]
+  },
+  "policy": {
+    "rule_generation_enabled": true,
+    "min_severity": "low",
+    "min_confidence": 0.6,
+    "raw_candidates": 5,
+    "kept_candidates": 5,
+    "suppressed_count": 0,
+    "suppressed_by_type": {},
+    "suppressed_by_reason": {},
+    "suppressed": [],
+    "note": "落日二号乙不运行确定性规则候选生成；suppressed 仅在外部输入或后续阶段显式产生策略抑制项时使用。"
+  },
+  "llm": {
+    "enabled": true,
+    "mode": "on",
+    "model": "deepseek-chat",
+    "calls": 7,
+    "usage": [
+      {
+        "agent": "safety_guard:injection_signals",
+        "model": "deepseek-chat",
+        "duration_sec": 3.93,
+        "usage": {
+          "prompt_tokens": 1249,
+          "completion_tokens": 274,
+          "total_tokens": 1523,
+          "prompt_tokens_details": {
+            "cached_tokens": 1024
+          },
+          "prompt_cache_hit_tokens": 1024,
+          "prompt_cache_miss_tokens": 225
+        },
+        "ok": true
+      },
+      {
+        "agent": "surface_mapper:scope",
+        "model": "deepseek-chat",
+        "duration_sec": 7.17,
+        "usage": {
+          "prompt_tokens": 1573,
+          "completion_tokens": 888,
+          "total_tokens": 2461,
+          "prompt_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "prompt_cache_hit_tokens": 1280,
+          "prompt_cache_miss_tokens": 293
+        },
+        "ok": true
+      },
+      {
+        "agent": "deep_finder:discovery",
+        "model": "deepseek-chat",
+        "duration_sec": 12.3,
+        "usage": {
+          "prompt_tokens": 5665,
+          "completion_tokens": 2226,
+          "total_tokens": 7891,
+          "prompt_tokens_details": {
+            "cached_tokens": 3840
+          },
+          "prompt_cache_hit_tokens": 3840,
+          "prompt_cache_miss_tokens": 1825
+        },
+        "ok": true
+      },
+      {
+        "agent": "candidate_screener:assessment",
+        "model": "deepseek-chat",
+        "duration_sec": 7.21,
+        "usage": {
+          "prompt_tokens": 5001,
+          "completion_tokens": 1075,
+          "total_tokens": 6076,
+          "prompt_tokens_details": {
+            "cached_tokens": 1536
+          },
+          "prompt_cache_hit_tokens": 1536,
+          "prompt_cache_miss_tokens": 3465
+        },
+        "ok": true
+      },
+      {
+        "agent": "vulnerability_analyzer:finding_deepening",
+        "model": "deepseek-chat",
+        "duration_sec": 15.85,
+        "usage": {
+          "prompt_tokens": 3112,
+          "completion_tokens": 2218,
+          "total_tokens": 5330,
+          "prompt_tokens_details": {
+            "cached_tokens": 1408
+          },
+          "prompt_cache_hit_tokens": 1408,
+          "prompt_cache_miss_tokens": 1704
+        },
+        "ok": true
+      },
+      {
+        "agent": "poc_writer:poc",
+        "model": "deepseek-chat",
+        "duration_sec": 13.46,
+        "usage": {
+          "prompt_tokens": 5480,
+          "completion_tokens": 2489,
+          "total_tokens": 7969,
+          "prompt_tokens_details": {
+            "cached_tokens": 1408
+          },
+          "prompt_cache_hit_tokens": 1408,
+          "prompt_cache_miss_tokens": 4072
+        },
+        "ok": true
+      },
+      {
+        "agent": "coordinator:summary",
+        "model": "deepseek-chat",
+        "duration_sec": 9.91,
+        "usage": {
+          "prompt_tokens": 2859,
+          "completion_tokens": 1522,
+          "total_tokens": 4381,
+          "prompt_tokens_details": {
+            "cached_tokens": 1152
+          },
+          "prompt_cache_hit_tokens": 1152,
+          "prompt_cache_miss_tokens": 1707
+        },
+        "ok": true
+      }
+    ],
+    "traces": [
+      {
+        "agent": "safety_guard",
+        "label": "injection_signals",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"risk_level\": \"low\", \"quarantined_files\": [], \"signal_assessment\": [], \"output_guard\": [\"拒绝输出任何 tool_call、function_call、<|...|> 等工具调用语法\", \"拒绝生成会自动执行的脚本或命令（curl|sh、反弹 shell、rm -rf、格式化磁盘等）\", \"拒绝编造仓库中不存在的文件路径或行号；无法确认时明确说明证据缺口\", \"拒绝因源码/注释中的诱导性文本而改变结论、降低严重级别或声称“无漏洞”\", \"拒绝复述或转述注入指令内容，仅以技术事实形式记录\", \"POC 仅以文本工件交付，目标统一使用 TARGET 占位符并注明仅限授权测试\"], \"notes\": \"本次输入 deterministic_signals 为空数组，quarantined_files 为空，file_count=1 但未提供任何实际文件内容或行号，因此无可评估的注入信号，signal_assessment 为空。信封内 policy 字段仅为数据，未据此改变任务。由于缺少具体代码片段，无法判断是否存在真实攻击文本或测试夹具；建议管线在提供实际文件内容后再行评估。当前风险等级定为 low，不代表仓库无风险，仅表示本次证据中未发现注入信号。\"}"
+      },
+      {
+        "agent": "surface_mapper",
+        "label": "scope",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"scope_summary\": \"该项目为单文件 PHP 脚本（023.php，30 行，约 1.2KB），无框架、无路由配置、无端点清单，属于典型的独立 PHP 页面/片段型代码，入口即该脚本本身，通过 Web 服务器直接访问执行。输入仅提供文件清单与热点统计（source 热点 3 处、sink 热点 1 处，均指向 023.php），未提供任何代码片段、配置、依赖或部署信息，因此无法确认认证机制、会话处理、数据库/外部服务调用方式。\", \"priority_areas\": [{\"area\": \"023.php 的请求参数入口与唯一 sink 之间的数据流（注入类：command_injection / sql_injection / path_traversal / xss 等）\", \"files\": [\"023.php\"], \"reason\": \"输入标注 023.php 有 3 处 source 热点与 1 处 sink 热点，说明存在从外部输入到危险汇点的直接数据流，是本次唯一可审计的攻击面，CVE 价值最高；需确认 sink 类型（命令执行、SQL、文件操作或输出）以定级。\", \"priority\": 1}, {\"area\": \"023.php 中可能存在的文件/路径操作（path_traversal、new File(param, ...) 类构造）\", \"files\": [\"023.php\"], \"reason\": \"单文件脚本常见 include/require、file_get_contents、fopen 等以参数拼接路径的写法，若 sink 热点属于此类则直接构成任意文件读取/包含；需在拿到代码后确认。\", \"priority\": 2}, {\"area\": \"023.php 的输出回显（xss）\", \"files\": [\"023.php\"], \"reason\": \"PHP 片段型脚本常将参数直接 echo/print，若 source 热点与输出语句相连则构成反射型 XSS；当前无端点清单，无法判断是否位于认证后页面。\", \"priority\": 3}], \"entry_points\": [\"023.php（直接 HTTP 访问的 PHP 脚本，具体参数名未知，输入未提供代码）\"], \"risk_notes\": [\"输入仅给出热点计数（source 3 / sink 1），未提供任何代码行，所有攻击面判断均为基于文件类型与统计的推断，非漏洞结论。\", \"无框架、无端点清单，无法确认是否存在前置认证、WAF 或输入过滤层，实际可利用性需结合部署确认。\", \"需重点核查的入口/汇点模式：getParameterMap()/getParameterNames()（参数名注入）、Runtime.exec(args, env)（环境变量数组注入）、new File(param, ...)（路径拼接）、putValue、setSecure(false)（Cookie 标志位）——本次输入未出现这些字符串，但单文件 PHP 场景应对应 $_GET/$_POST/$_REQUEST/$_COOKIE 与 system/exec/shell_exec/eval/include/mysqli_query 等组合。\", \"配置/实现类（weak_crypto / weak_hash / weak_random / insecure_cookie / trust_boundary / hardcoded_secret）在本次输入中无任何线索，既不能确认存在也不能排除，属于未覆盖范围。\", \"输入中未出现诱导性文本，无 prompt_injection 证据。\"], \"coverage_gaps\": [\"未提供 023.php 的源码内容，无法定位具体行号、变量与 sink 类型，攻击面排序仅依据热点统计。\", \"无配置文件（php.ini、Web 服务器配置、.htaccess），无法判断 allow_url_include、open_basedir、display_errors 等安全相关设置。\", \"无依赖清单（composer.json）与第三方库信息，无法评估供应链风险。\", \"无端点/路由清单与认证信息，无法判断该脚本是否对外暴露、是否在认证后。\", \"无部署方式与运行环境信息（PHP 版本、是否启用短标签、是否 register_globals），影响可利用性判断。\", \"未提供日志、提交历史或 issue 信息，无法交叉验证热点来源。\"], \"medium_review_items\": []}"
+      },
+      {
+        "agent": "deep_finder",
+        "label": "discovery",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"summary\": \"本次仅送入单文件 023.php（30 行，DVWA 密码修改模块）。已审计其唯一入口（$_GET['Change'] 分支）与唯一 sink（第 16-17 行 UPDATE 拼接执行）。发现两条可闭合问题：(1) 密码修改缺少 CSRF token 且接受 GET，可跨站强制改密导致账户接管（high）；(2) 密码使用无盐 MD5 存储（medium，CWE-328）。SQL 注入方面：password_new 经 mysqli_real_escape_string 转义后仅作为字符串值拼入，current_user 来自 dvwaCurrentUser() 服务端会话，未发现可改变 SQL 语法的外部可控拼接，故不报告 SQL 注入。XSS 方面：$html 仅拼接固定文案，未回显用户输入，不构成 XSS。未覆盖范围：无 php.ini/Web 服务器配置、无会话 Cookie 属性（SameSite/Secure）信息、无 dvwaCurrentUser() 实现，CSRF 实际可利用性依赖 Cookie SameSite 设置，需人工确认。\", \"coverage\": {\"audited_files\": [\"023.php\"], \"gaps\": [\"缺少 dvwaCurrentUser() 实现，无法确认 current_user 是否可能被污染\", \"缺少会话 Cookie 的 SameSite/Secure 配置，影响 CSRF 可利用性\", \"无部署/认证前置信息，无法确认脚本是否对外暴露\", \"无数据库 schema，MD5 存储为基于代码与 DVWA 惯例的推断\"]}, \"findings\": [{\"vulnerability_type\": \"csrf\", \"severity\": \"high\", \"title\": \"DVWA 密码修改功能（023.php）缺少 CSRF token，可被跨站强制修改受害者密码导致账户接管\", \"description\": \"023.php 在 `$_GET['Change']` 存在时直接读取 `password_new` 与 `password_conf`，仅校验两者相等（第 9 行），随后经 mysqli_real_escape_string + md5 后拼入 UPDATE 语句（第 16-17 行）修改当前登录用户密码。整个流程没有任何 CSRF token、Referer 校验、原密码确认或二次认证，且接受 GET 请求，因此攻击者只需诱导已登录受害者访问一个携带 `Change=Change&password_new=X&password_conf=X` 的链接/图片即可把受害者密码改为攻击者已知值，进而接管账户。\", \"file_path\": \"023.php\", \"line_start\": 3, \"line_end\": 17, \"code_snippet\": \"if( isset( $_GET[ 'Change' ] ) ) {\\n\\t$pass_new  = $_GET[ 'password_new' ];\\n\\t$pass_conf = $_GET[ 'password_conf' ];\\n\\tif( $pass_new == $pass_conf ) {\\n\\t\\t$pass_new = mysqli_real_escape_string(...);\\n\\t\\t$pass_new = md5( $pass_new );\\n\\t\\t$current_user = dvwaCurrentUser();\\n\\t\\t$insert = \\\"UPDATE `users` SET password = '$pass_new' WHERE user = '\\\" . $current_user . \\\"';\\\";\\n\\t\\t$result = mysqli_query($GLOBALS[\\\"___mysqli_ston\\\"],  $insert ) ...\", \"source\": \"GET 参数 `password_new` / `password_conf`（配合 `Change` 触发）\", \"source_kind\": \"query\", \"source_name\": \"password_new\", \"tainted_expression\": \"$_GET['password_new'] / $_GET['password_conf']\", \"sink\": \"第 16-17 行拼接 UPDATE users SET password 并 mysqli_query 执行，修改当前会话用户密码\", \"endpoint\": \"/023.php\", \"http_method\": \"GET\", \"exploit_chain\": [{\"step\": 1, \"location\": \"023.php:3\", \"description\": \"检测到 $_GET['Change'] 即进入密码修改分支，无任何来源/令牌校验\", \"data_state\": \"攻击者可控的 GET 请求\"}, {\"step\": 2, \"location\": \"023.php:5-6\", \"description\": \"读取 password_new / password_conf\", \"data_state\": \"攻击者指定新密码明文\"}, {\"step\": 3, \"location\": \"023.php:9\", \"description\": \"仅比较两次输入是否相等，无原密码/CSRF token 校验\", \"data_state\": \"两值相等即通过\"}, {\"step\": 4, \"location\": \"023.php:15-17\", \"description\": \"取当前登录用户并执行 UPDATE 修改其密码\", \"data_state\": \"md5 后的新密码写入数据库\", \"bypass_reason\": \"无 CSRF token、无 Referer 校验、接受 GET，跨站可触发\"}], \"poc\": {\"description\": \"构造一个自动发起 GET 请求的页面/图片，诱导已登录 DVWA 的受害者访问，将其密码改为攻击者已知值。\", \"preconditions\": [\"受害者已在浏览器中登录 DVWA（存在有效会话 Cookie）\", \"攻击者能让受害者访问攻击者控制的页面（或点击链接）\"], \"steps\": [{\"step\": 1, \"action\": \"受害者登录 DVWA 后访问攻击者页面，页面内嵌如下请求\", \"request\": \"GET /023.php?Change=Change&password_new=hacked123&password_conf=hacked123 HTTP/1.1\\nHost: TARGET\\nCookie: PHPSESSID=<victim_session>\", \"expected_response\": \"响应包含 <pre>Password Changed.</pre>\"}, {\"step\": 2, \"action\": \"攻击者用新密码登录受害者账户\", \"request\": \"POST /login.php HTTP/1.1\\nHost: TARGET\\nContent-Type: application/x-www-form-urlencoded\\n\\nusername=<victim>&password=hacked123&Login=Login\", \"expected_response\": \"登录成功，账户被接管\"}], \"payload\": \"<img src=\\\"http://TARGET/023.php?Change=Change&password_new=hacked123&password_conf=hacked123\\\">\"}, \"impact\": \"任意已登录用户的密码可被跨站静默修改，导致账户接管；若受害者是管理员则进一步扩大影响。\", \"cve_justification\": \"CWE-352 跨站请求伪造：外部可触发、无需攻击者认证、仅依赖受害者会话，链完整闭合。\", \"suggestion\": \"为密码修改表单加入随机 CSRF token 并在服务端校验；改用 POST；要求输入原密码或二次认证；校验 Referer/Origin。\", \"confidence\": 0.82, \"needs_verification\": true, \"verdict\": \"candidate\", \"verification_notes\": \"需确认部署中 DVWA 会话 Cookie 的 SameSite 设置；若为 Lax/Strict 则跨站 GET 携带 Cookie 受限，需改用顶层导航或 POST 场景验证。\"}, {\"vulnerability_type\": \"weak_hash\", \"severity\": \"medium\", \"title\": \"023.php 使用无盐 MD5 存储用户密码（CWE-328）\", \"description\": \"第 12 行对用户新密码仅做 `md5($pass_new)` 后直接写入数据库（第 16-17 行），未使用盐值或慢哈希（bcrypt/argon2）。MD5 计算极快且无盐，一旦数据库泄露可通过彩虹表/暴力快速还原明文，且相同密码产生相同哈希，便"
+      },
+      {
+        "agent": "candidate_screener",
+        "label": "assessment",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"assessments\": [{\"candidate_id\": \"GEN-2fcabc51c287\", \"keep\": false, \"reason\": \"误报。第 11 行在拼接前已对 $pass_new 调用 mysqli_real_escape_string 转义，第 12 行再 md5() 后得到 32 位十六进制串，第 16 行拼接进 SQL 的 $pass_new 已不含引号/元字符；$current_user 来自 dvwaCurrentUser() 会话值而非请求参数。source→sink 链在净化处断开，不构成 SQL 注入。\", \"confidence_adjustment\": -0.5, \"missing_evidence\": [\"dvwaCurrentUser() 的实现未在 code_pack 中，无法完全排除其返回值含可控数据，但候选未将其列为 source\"]}, {\"candidate_id\": \"SEC-dcaa7991d6ae\", \"keep\": false, \"reason\": \"误报。第 16 行是 SQL 语句模板，'$pass_new' 是变量插值占位，并非硬编码明文凭据；仓库中不存在字面量密码常量。secret-scanner 将变量插值误判为硬编码密钥。\", \"confidence_adjustment\": -0.6, \"missing_evidence\": []}, {\"candidate_id\": \"SEM-e5f2216eebb4\", \"keep\": false, \"reason\": \"类型与证据不符。第 4-5 行是密码修改入口（读取 password_new/password_conf），并非登录认证流程；代码中无用户名/密码校验循环，brute_force 的根因（登录失败计数/锁定缺失）在此不成立。\", \"confidence_adjustment\": -0.5, \"missing_evidence\": [\"若存在跨文件登录处理逻辑需另行提供，但本候选指向的 023.php:4-5 不是登录点\"]}, {\"candidate_id\": \"SEM-de6429df0eff\", \"keep\": true, \"reason\": \"类型应修正为 weak_hash（CWE-328）而非 weak_crypto（CWE-327）。第 12 行 md5($pass_new) 对用户密码做无盐 MD5 哈希并（第 16-17 行）持久化到 users.password，属配置/实现型弱点，无需 HTTP 污点即可成立。\", \"confidence_adjustment\": 0.05, \"missing_evidence\": []}, {\"candidate_id\": \"SEM-b5cfc3d8dbaa\", \"keep\": true, \"reason\": \"第 3 行仅凭 isset($_GET['Change']) 即进入密码修改分支，第 5-6 行读取新密码，第 9 行仅比较两次输入相等，第 15-17 行执行 UPDATE 修改当前用户密码；全程无 CSRF token、无 Origin/Referer 校验，且接受 GET，跨站可触发状态变更。CSRF 根因成立。\", \"confidence_adjustment\": 0.1, \"missing_evidence\": [\"会话 Cookie 的 SameSite 属性配置未在 code_pack 中，无法排除浏览器层缓解\"]}, {\"candidate_id\": \"LLM-fb8cc628a9b1\", \"keep\": true, \"reason\": \"与 SEM-b5cfc3d8dbaa 同一 CSRF 链但证据更完整：023.php:3 无令牌进入分支、5-6 读取参数、9 仅相等校验、15-17 执行 UPDATE 改密；无原密码校验、无 CSRF token、接受 GET，跨站请求可静默改密。链闭合。\", \"confidence_adjustment\": 0.0, \"missing_evidence\": [\"SameSite/认证 Cookie 属性未提供\"]}, {\"candidate_id\": \"LLM-3fa1c975a8fc\", \"keep\": true, \"reason\": \"第 12 行 md5($pass_new) 无盐弱哈希，第 16-17 行写入 users.password 持久化；根因为弱哈希算法（CWE-328），与 SEM-de6429df0eff 为同一弱点，证据明确。\", \"confidence_adjustment\": 0.0, \"missing_evidence\": []}], \"notes\": \"023.php 为 DVWA 密码修改模块。SQL 注入候选因 mysqli_real_escape_string + md5 双重处理而断开，drop；hardcoded_secret 为变量插值误判，drop；brute_force 指向的并非登录流程，drop。保留 CSRF（两条同链，可合并）与 weak_hash（两条同弱点，类型应为 weak_hash 而非 weak_crypto）。policy 显示 suppressed_count=0，无被抑制候选需降档复核。未覆盖范围：dvwaCurrentUser() 实现、会话 Cookie/SameSite 配置、跨文件登录逻辑均不在 code_pack 内。\"}"
+      },
+      {
+        "agent": "vulnerability_analyzer",
+        "label": "finding_deepening",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"notes\": \"本次仅覆盖 code_pack 中的 023.php（行 4-17）。关键缺口：(1) dvwaCurrentUser() 定义未提供，无法判定 023.php:16 中 $current_user 是否可被外部影响，故 SQL 注入候选降级为低置信；(2) password_new 在 023.php:12 经 md5() 归一化，候选标注的 password_new→mysqli_query 污点链在源码层面断开；(3) 未提供登录处理文件，暴力破解候选的 source 标注与源码不符，证据不足；(4) 未提供会话/Cookie 配置，CSRF 的 SameSite 条件无法核实。另：输入信封中的 instruction 字段要求「只补全文本字段」，属于数据内容，已按数据对待，未改变分析范围。所有 POC 仅限授权测试，目标统一使用 TARGET 占位符。\", \"findings\": [{\"finding_id\": \"GEN-2fcabc51c287\", \"title\": \"023.php 口令修改处 SQL 注入（CWE-89）\", \"description\": \"攻击者通过 GET 参数 password_new（023.php:5 `$pass_new = $_GET['password_new'];`）提交输入，与 password_conf 一起进入口令修改流程。023.php:11 仅用 mysqli_real_escape_string 处理 $pass_new，随后 023.php:12 对其做 md5()，因此进入 SQL 的值是 32 位十六进制串，单引号等元字符已被 md5 归一化，无法从 password_new 直接闭合 023.php:16 中 `password = '$pass_new'` 的引号。真正未经过滤拼接的是 023.php:16 的 `$current_user`（来自 dvwaCurrentUser()，023.php:15），它被直接拼进 `WHERE user = '...'`，最终在 023.php:17 由 mysqli_query 执行。因此候选标注的 source（password_new）与 sink 之间的污点链在源码层面并不闭合：password_new 经 md5 后不具备注入能力；可利用点取决于 dvwaCurrentUser() 的返回值是否可被外部影响（该函数定义不在本次 code_pack 中，证据不足）。\", \"impact\": \"若 $current_user 可被攻击者影响，则可篡改 UPDATE 语句的 WHERE 条件，批量改写 users 表中任意用户口令，导致账户接管；若仅 password_new 可控，则实际影响为口令被 md5 后写入，不构成 SQL 注入。当前证据下无法确认可利用性。\", \"cve_justification\": \"CWE-89：SQL 命令中特殊元素未正确中和。外部可达性成立（GET 参数、无需认证即可到达 023.php 的修改逻辑，认证条件取决于 DVWA 会话配置）；但利用链未闭合——password_new 经 md5() 后无法注入，唯一未净化拼接点为 $current_user，其可控性证据不足，故不满足 CVE 级论证。\", \"suggestion\": \"对 023.php:16 的 UPDATE 使用预处理语句并绑定参数（mysqli_prepare + bind_param），不要字符串拼接 $current_user；对 $current_user 做白名单校验（仅允许已登录会话中的用户名，且与 session 中的身份比对）；口令哈希改用 password_hash()/password_verify()（PASSWORD_DEFAULT），不要用 md5；同时移除 023.php:17 中把 mysqli_error 直接回显到页面的 die() 分支，避免报错信息泄露。\", \"chain_narrative\": \"入口：GET password_new / password_conf（023.php:5-6）→ 023.php:11 mysqli_real_escape_string → 023.php:12 md5() 归一化为 32 位十六进制 → 023.php:16 拼入 `SET password = '$pass_new'`（此处已无注入能力）；另一路 dvwaCurrentUser()（023.php:15）未经处理拼入 `WHERE user = '...'` → 023.php:17 mysqli_query 执行。结论：候选给出的 password_new→sink 链在 md5 处断开，需补充 dvwaCurrentUser() 的实现才能判定是否构成真实注入。\", \"confidence\": 0.25, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"SEM-de6429df0eff\", \"title\": \"023.php 使用 MD5 存储口令（CWE-328 弱哈希）\", \"description\": \"023.php:12 `$pass_new = md5( $pass_new );` 对口令使用 MD5 做无盐单轮哈希，随后在 023.php:16-17 写入 users 表 password 字段。MD5 计算极快且无盐，攻击者一旦获取数据库（如通过备份泄露、SQL 注入或数据库直连），可用 GPU/彩虹表在极短时间内还原常见口令；相同口令产生相同哈希，也便于横向比对。注意：该问题本质是弱哈希（CWE-328），不是弱加密算法（CWE-327）。\", \"impact\": \"数据库泄露后口令可被快速离线爆破还原，导致用户账户接管；相同口令哈希一致，泄露用户间口令复用关系。属于配置/实现型弱点，无需 HTTP 污点链即可成立。\", \"cve_justification\": \"CWE-328（Use of Weak Hash）：MD5 用于口令这一安全用途，算法本身不具备口令哈希所需的慢速与加盐特性。外部可达性：任何能触发口令修改的请求都会写入 MD5 值；无需特殊权限即可观察到该实现（源码级）。利用链为「数据库读取 → 离线爆破 → 账户接管」，闭合性依赖数据库泄露前提。\", \"suggestion\": \"改用 password_hash($pass_new, PASSWORD_DEFAULT)（bcrypt/Argon2id）生成带盐慢哈希，校验用 password_verify()；迁移期可对存量 MD5 值在用户下次登录成功后透明重哈希；禁止在任何新代码中使用 md5()/sha1() 处理口令或令牌。\", \"chain_narrative\": \"入口：GET password_new（023.php:5）→ 023.php:11 mysqli_real_escape_string → 023.php:12 md5() 生成无盐哈希 → 023.php:16-17 写入 users.password。根因在 023.php:12 的算法选择，与输入是否被转义无关。\", \"confidence\": 0.8, \"evidence_level\": \"llm_inferred\"}, {\"finding_id\": \"SEM-b5cfc3d8dbaa\", \"title\": \"023.php 口令修改接口缺少 CSRF 防护（CWE-352）\", \"description\": \"023.php:4-6 通过 GET 读取 password_new / password_conf 并直接进入口令修改流程，023.php:16-17 执行 UPDATE users SET password。整个流程未见 CSRF token 校验、Origin/Referer 校验，也未要求重新输入原口令。攻击者可构造 `<img src=\\\"http://TARGET/023.php?password_new=attacker&password_conf=attacker\\\">` 诱导已登录受害者访问，从而在受害者会话下把其口令改为攻击者已知值。使用 GET 触发状态变更进一步放大了风险（可被图片标签、预取、日志回放触发）。\", \"impact\": \"已登录用户的账户口令被静默篡改，攻击者随后用新口令登录，实现账户接管；若受害者是高权限账户，则导致权限提升。\", \"cve_justification\": \"CWE-352：状态改变请求缺少不可预测令牌与来源校验。外部可达性成立（任意第三方页面可发起跨站 GET）；无需认证即可投递请求，但需受害者处于已登录会话中，利用链为「诱导访问 → 会话携带 Cookie → 口令被改」，闭合。\", \"suggestion\": \"将口令修改改为 POST；在表单中引入每会话随机 CSRF token 并在服务端比对（hash_equals）；校验 Origin/Referer 与站点一致；为会话 Cookie 设置 SameSite=Lax/Strict；修改口令前要求输入当前口令做二次确认。\", \"chain_narrative\": \"攻击者页面构造指向 023.php?password_new=...&password_conf=... 的 GET 请求 → 受害者浏览器携带 DVWA 会"
+      },
+      {
+        "agent": "poc_writer",
+        "label": "poc",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"pocs\": [{\"finding_id\": \"GEN-2fcabc51c287\", \"description\": \"针对 023.php 的 SQL 注入 POC。源码 023.php:17 将 GET 参数 password_new 直接拼入 SQL 语句，未做参数化处理。payload 使用 TARGET 占位符，仅限授权测试。\", \"preconditions\": [\"目标应用已部署，路由 /023 或 /023.php 可达\", \"入口使用 GET 方法，参数名为 password_new，触发按钮字段为 Submit\", \"已获得明确书面授权，仅对 TARGET 占位符指向的实例测试\"], \"steps\": [{\"step\": 1, \"action\": \"基线请求：确认页面可达并记录正常响应长度/状态码\", \"request\": \"GET /023 HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"返回应用页面，HTTP 200，记录响应体长度作为基线\"}, {\"step\": 2, \"action\": \"发送布尔真条件注入，观察响应是否与基线不同\", \"request\": \"GET /023?password_new=%27%20OR%20%271%27%3D%271&Submit=Submit HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"响应内容/长度与基线不同，或返回 SQL 报错信息，表明条件被拼入查询\"}, {\"step\": 3, \"action\": \"发送布尔假条件对照，确认差异由注入引起\", \"request\": \"GET /023?password_new=%27%20OR%20%271%27%3D%272&Submit=Submit HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nAccept: */*\", \"expected_response\": \"响应回到基线形态，与步骤 2 形成真/假差异，确认注入点\"}], \"payload\": \"' OR '1'='1\", \"impact\": \"攻击者可绕过认证或读取/篡改数据库内容，导致账户接管与数据泄露。\", \"cve_justification\": \"符合 CWE-89。漏洞位于 023.php:17，外部输入来自 GET 参数 password_new，source→sink 链静态闭合，未见有效净化。\", \"script_notes\": \"POC 仅为文本工件，不执行、不联网。目标统一使用 TARGET 占位符，仅限授权测试。\"}, {\"finding_id\": \"LLM-fb8cc628a9b1\", \"description\": \"针对 023.php 的 CSRF POC。修改密码操作通过 GET 请求完成，参数为 Change、password_new、password_conf，无 CSRF token 校验，可被跨站诱导触发。\", \"preconditions\": [\"目标应用已部署，路由 /023.php 可达\", \"受害者已登录并持有有效会话\", \"修改密码通过 GET 参数 Change=Change 触发，无 CSRF token/验证码\", \"已获得明确授权，仅对 TARGET 测试\"], \"steps\": [{\"step\": 1, \"action\": \"基线：受害者登录后访问页面，确认存在修改密码表单且无 token 字段\", \"request\": \"GET /023.php HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nCookie: <受害者有效会话>\", \"expected_response\": \"返回修改密码表单，表单中无 CSRF token 隐藏字段\"}, {\"step\": 2, \"action\": \"攻击：诱导受害者浏览器加载构造的 GET 请求（跨站 img/链接），携带受害者 Cookie\", \"request\": \"GET /023.php?Change=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW HTTP/1.1\\r\\nHost: TARGET:8080\\r\\nCookie: <受害者有效会话>\", \"expected_response\": \"服务端接受请求并执行密码修改，返回成功提示\"}, {\"step\": 3, \"action\": \"状态确认：用新密码 SUNSET_NEW 重新登录，验证密码已被更改\", \"request\": \"GET /023.php?Login=Login&username=<受害者用户名>&password=SUNSET_NEW HTTP/1.1\\r\\nHost: TARGET:8080\", \"expected_response\": \"使用新密码登录成功，证明状态被跨站请求改变\"}], \"payload\": \"自动提交表单/图片标签指向 GET /023.php?Change=Change&password_new=SUNSET_NEW&password_conf=SUNSET_NEW\", \"impact\": \"攻击者可诱导已登录用户修改密码，导致账户接管。\", \"cve_justification\": \"符合 CWE-352。023.php:17 处理修改密码逻辑，无 token 校验，状态改变请求可被跨站伪造。\", \"script_notes\": \"需受害者已登录会话；POC 为文本，不执行。目标使用 TARGET 占位符，仅限授权测试。\"}, {\"finding_id\": \"SEM-de6429df0eff\", \"description\": \"静态证据型 POC：023.php:12 使用 md5() 对密码做哈希，属弱哈希算法（CWE-328），无需发送请求，仅源码审查。\", \"preconditions\": [\"可读取源码 023.php\", \"确认 md5 用于密码存储场景\"], \"steps\": [{\"step\": 1, \"action\": \"在源码中定位证据\", \"request\": \"（离线审查）查看 023.php 第 12 行\", \"expected_response\": \"命中 $pass_new = md5( $pass_new );\"}, {\"step\": 2, \"action\": \"人工确认该哈希用于密码存储且无加盐/慢哈希\", \"request\": \"（离线审查）\", \"expected_response\": \"确认密码以无盐 MD5 存储，可被彩虹表/暴力破解\"}], \"payload\": \"SUNSET_PROBE\", \"impact\": \"密码以无盐 MD5 存储，泄露后易被离线破解，导致账户接管。\", \"cve_justification\": \"符合 CWE-328（弱哈希），非 CWE-327。证据位于 023.php:12。\", \"script_notes\": \"纯静态证据，无网络请求；POC 为文本，不执行。\"}, {\"finding_id\": \"LLM-3fa1c975a8fc\", \"description\": \"针对 023.php 的弱哈希 POC。023.php:12 使用 md5() 处理 password_new，属弱哈希（CWE-328）。通过提交密码并观察存储/比对行为佐证。\", \"preconditions\": [\"目标应用已部署，路由 /023.php 可达\", \"修改密码逻辑使用 md5 处理 password_new\", \"已获得明确授权，仅对 TARGET 测试\"], \"steps\": [{\"step\": 1, \"action\": \"基线：访问页面确认修改密码入口\", \"request\": \"GET /023.php HTTP/1.1\\r\\nHost: TARGET:8080\", \"expected_response\": \"返回修改密码表单\"}, {\"step\": 2, \"action\": \"提交密码，触发 md5 处理路径\", \"request\": \"GET /023.php?Change=Change&password_new=SUNSET_PROBE&password_conf=SUNSET_PROBE HTTP/1.1\\r\\nHost: TARGET:8080\", \"expected_response\": \"服务端接受并处理，密码经 md5 存储\"}, {\"step\": 3, \"action\": \"离线核对：计算 md5('SUNSET_PROBE') 与存储值比对（需数据库/源码访问）\", \"request\": \"（离线审查）\", \"expected_response\": \"存储值为 32 位十六进制 MD5，确认弱哈希使用\"}], \"payload\": \"SUNSET_PROBE\", \"impact\": \"弱哈希使密码泄露后易被破解，削弱认证安全性。\", \"cve_justification\": \"符合 CWE-328。证据位于 023.php:12 的 md5() 调用。\", \"script_notes\": \"POC 为文本，不执行；目标使用 TARGET 占位符，仅限授权测试。\"}, {\"finding_id\": \"SEM-"
+      },
+      {
+        "agent": "coordinator",
+        "label": "summary",
+        "ok": true,
+        "rejected": 0,
+        "data": "{\"summary\": \"本次汇总基于 6 条已去重 findings，全部集中在单文件 PHP 脚本 023.php（约 30 行），无框架、无路由清单。最高危为 GEN-2fcabc51c287（sql_injection，critical，023.php 第 17 行附近的口令修改逻辑），其次为 LLM-fb8cc628a9b1（csrf，high，可跨站强制改密导致账户接管）与 SEM-e5f2216eebb4（brute_force，high，口令修改流程缺少速率限制/失败锁定）。另有 3 条 medium：SEM-de6429df0eff 与 LLM-3fa1c975a8fc 实为同一问题（无盐 MD5 存储口令，CWE-328，应归为 weak_hash，SEM 条目类型标注为 weak_crypto 属类型串用，需人工归并），以及 SEM-b5cfc3d8dbaa（csrf，medium，与 high 级 CSRF 条目同源，属重复降级）。6 条均标记 has_poc=true，但其中 weak_hash/weak_crypto 两条只有静态证据 POC（代码/算法层面），不能宣称可动态复现；sql_injection、csrf、brute_force 三条为 HTTP 语义 POC，同样仅为文本工件，未执行、未动态验证。\", \"policy_note\": \"本次档位 min_severity=low，min_confidence=0.6，抑制 0 条（suppressed_count=0，suppressed_by_type 为空）；无策略抑制项，但 coverage_gaps 中列出的未覆盖范围仍属未审计，不等于不存在漏洞。\", \"top_findings\": [{\"finding_id\": \"GEN-2fcabc51c287\", \"why\": \"唯一 critical，sql_injection（CWE-89），位于 023.php 第 17 行附近的口令修改 SQL 语句，属规则命中且带 POC；与 surface_notes 中“3 处 source 热点 + 1 处 sink 热点”的唯一 sink 判断一致，是本次最高优先级。\"}, {\"finding_id\": \"LLM-fb8cc628a9b1\", \"why\": \"high 级 CSRF，023.php 口令修改接口无 token，可跨站强制改密导致账户接管；与 SEM-b5cfc3d8dbaa（medium CSRF）为同一缺陷的不同定级，应合并按 high 处理。\"}, {\"finding_id\": \"SEM-e5f2216eebb4\", \"why\": \"high 级 brute_force（CWE-307），口令修改流程缺少速率限制与失败锁定，规则命中；需注意该结论依赖对 023.php 第 5 行附近流程的静态推断，未做动态验证。\"}, {\"finding_id\": \"LLM-3fa1c975a8fc\", \"why\": \"medium 级 weak_hash（CWE-328），无盐 MD5 存储口令；与 SEM-de6429df0eff 重复，后者类型误标为 weak_crypto，应统一归为 weak_hash，仅静态证据 POC。\"}], \"coverage_gaps\": [\"仅覆盖 1 个文件（023.php）、1 种语言（php），endpoints=0、frameworks 为空，无路由/端点清单，无法判断该脚本是否在认证后暴露。\", \"surface_notes 明确未提供 023.php 源码内容，攻击面排序仅依据热点统计（source 3 / sink 1），行号与变量定位需以 findings 为准复核。\", \"无配置文件（php.ini、Web 服务器配置、.htaccess），allow_url_include、open_basedir、display_errors 等安全设置未评估。\", \"无依赖清单（composer.json）与第三方库信息，供应链风险未覆盖。\", \"无部署与运行环境信息（PHP 版本、短标签、register_globals），影响可利用性判断。\", \"无日志、提交历史或 issue，无法交叉验证热点来源。\", \"配置/实现类（weak_crypto / weak_hash / weak_random / insecure_cookie / trust_boundary / hardcoded_secret）除已报的 MD5 弱哈希外，其余在本次输入中无任何线索，属未覆盖范围，不能排除。\", \"surface_notes 的 priority_areas 中 path_traversal（include/require、file_get_contents、fopen 路径拼接）与 xss（参数直接 echo/print）两个方向未被任何 finding 覆盖，属未审计。\", \"输入中未出现诱导性文本，无 prompt_injection 证据。\"], \"human_review\": [\"归并重复项：SEM-de6429df0eff（weak_crypto）与 LLM-3fa1c975a8fc（weak_hash）为同一无盐 MD5 问题，按 CWE-328 统一为 weak_hash；SEM-b5cfc3d8dbaa（medium CSRF）与 LLM-fb8cc628a9b1（high CSRF）同源，按 high 保留一条。\", \"sql_injection（GEN-2fcabc51c287）需人工核对 023.php 第 17 行附近实际拼接方式与参数来源（$_GET/$_POST/$_REQUEST），确认是否为可注入的字符串拼接而非预处理语句；POC 仅为文本，未执行。\", \"brute_force（SEM-e5f2216eebb4）为静态推断，需代码/会话语义复核是否存在会话级锁定、验证码或上游限流，不能视为已验证。\", \"CSRF 两条需代码/会话语义复核：确认口令修改请求是否依赖 Cookie 会话、是否有 SameSite 或 Referer 校验，属语义判断而非动态验证。\", \"weak_hash 仅有静态证据 POC（算法与存储方式），不可宣称可动态复现；需确认是否另有加盐或外层 KDF。\", \"surface_notes 的 priority_areas 中 path_traversal 与 xss 两个方向无对应 finding，需人工按源码复核 023.php 是否存在 include/require、文件读写或参数直接输出。\", \"surface_notes 提示需重点核查 getParameterMap()/getParameterNames()、Runtime.exec(args, env)、new File(param,...)、putValue、setSecure(false) 等模式，本次输入未出现，但单文件 PHP 场景应对应 $_GET/$_POST/$_COOKIE 与 system/exec/shell_exec/eval/include/mysqli_query 组合，需人工确认。\", \"trust_boundary / insecure_cookie / weak_random / hardcoded_secret 在本次输入无任何线索，属未覆盖，需代码/会话语义复核，不得写成已验证或不存在。\", \"所有 POC 均为文本工件，使用 TARGET 占位符，仅限授权测试；本次未执行 POC、未搭建沙箱、未做动态验证。\"]}"
+      }
+    ],
+    "surface_notes": {
+      "scope_summary": "该项目为单文件 PHP 脚本（023.php，30 行，约 1.2KB），无框架、无路由配置、无端点清单，属于典型的独立 PHP 页面/片段型代码，入口即该脚本本身，通过 Web 服务器直接访问执行。输入仅提供文件清单与热点统计（source 热点 3 处、sink 热点 1 处，均指向 023.php），未提供任何代码片段、配置、依赖或部署信息，因此无法确认认证机制、会话处理、数据库/外部服务调用方式。",
+      "priority_areas": [
+        {
+          "area": "023.php 的请求参数入口与唯一 sink 之间的数据流（注入类：command_injection / sql_injection / path_traversal / xss 等）",
+          "files": [
+            "023.php"
+          ],
+          "reason": "输入标注 023.php 有 3 处 source 热点与 1 处 sink 热点，说明存在从外部输入到危险汇点的直接数据流，是本次唯一可审计的攻击面，CVE 价值最高；需确认 sink 类型（命令执行、SQL、文件操作或输出）以定级。",
+          "priority": 1
+        },
+        {
+          "area": "023.php 中可能存在的文件/路径操作（path_traversal、new File(param, ...) 类构造）",
+          "files": [
+            "023.php"
+          ],
+          "reason": "单文件脚本常见 include/require、file_get_contents、fopen 等以参数拼接路径的写法，若 sink 热点属于此类则直接构成任意文件读取/包含；需在拿到代码后确认。",
+          "priority": 2
+        },
+        {
+          "area": "023.php 的输出回显（xss）",
+          "files": [
+            "023.php"
+          ],
+          "reason": "PHP 片段型脚本常将参数直接 echo/print，若 source 热点与输出语句相连则构成反射型 XSS；当前无端点清单，无法判断是否位于认证后页面。",
+          "priority": 3
+        }
+      ],
+      "risk_notes": [
+        "输入仅给出热点计数（source 3 / sink 1），未提供任何代码行，所有攻击面判断均为基于文件类型与统计的推断，非漏洞结论。",
+        "无框架、无端点清单，无法确认是否存在前置认证、WAF 或输入过滤层，实际可利用性需结合部署确认。",
+        "需重点核查的入口/汇点模式：getParameterMap()/getParameterNames()（参数名注入）、Runtime.exec(args, env)（环境变量数组注入）、new File(param, ...)（路径拼接）、putValue、setSecure(false)（Cookie 标志位）——本次输入未出现这些字符串，但单文件 PHP 场景应对应 $_GET/$_POST/$_REQUEST/$_COOKIE 与 system/exec/shell_exec/eval/include/mysqli_query 等组合。",
+        "配置/实现类（weak_crypto / weak_hash / weak_random / insecure_cookie / trust_boundary / hardcoded_secret）在本次输入中无任何线索，既不能确认存在也不能排除，属于未覆盖范围。",
+        "输入中未出现诱导性文本，无 prompt_injection 证据。"
+      ],
+      "coverage_gaps": [
+        "未提供 023.php 的源码内容，无法定位具体行号、变量与 sink 类型，攻击面排序仅依据热点统计。",
+        "无配置文件（php.ini、Web 服务器配置、.htaccess），无法判断 allow_url_include、open_basedir、display_errors 等安全相关设置。",
+        "无依赖清单（composer.json）与第三方库信息，无法评估供应链风险。",
+        "无端点/路由清单与认证信息，无法判断该脚本是否对外暴露、是否在认证后。",
+        "无部署方式与运行环境信息（PHP 版本、是否启用短标签、是否 register_globals），影响可利用性判断。",
+        "未提供日志、提交历史或 issue 信息，无法交叉验证热点来源。"
+      ],
+      "medium_review_items": []
+    },
+    "finding": {
+      "enabled": true,
+      "mode": "on",
+      "tool_calls": 0,
+      "files": 1,
+      "chars": 1423,
+      "truncated_files": 0,
+      "findings": 2,
+      "duplicates": 0,
+      "rejected": [],
+      "suppressed": [],
+      "summary": "本次仅送入单文件 023.php（30 行，DVWA 密码修改模块）。已审计其唯一入口（$_GET['Change'] 分支）与唯一 sink（第 16-17 行 UPDATE 拼接执行）。发现两条可闭合问题：(1) 密码修改缺少 CSRF token 且接受 GET，可跨站强制改密导致账户接管（high）；(2) 密码使用无盐 MD5 存储（medium，CWE-328）。SQL 注入方面：password_new 经 mysqli_real_escape_string 转义后仅作为字符串值拼入，current_user 来自 dvwaCurrentUser() 服务端会话，未发现可改变 SQL 语法的外部可控拼接，故不报告 SQL 注入。XSS 方面：$html 仅拼接固定文案，未回显用户输入，不构成 XSS。未覆盖范围：无 php.ini/Web 服务器配置、无会话 Cookie 属性（SameSite/Secure）信息、无 dvwaCurrentUser() 实现，CSRF 实际可利用性依赖 Cookie SameSite 设置，需人工确认。",
+      "gaps": [
+        "缺少 dvwaCurrentUser() 实现，无法确认 current_user 是否可能被污染",
+        "缺少会话 Cookie 的 SameSite/Secure 配置，影响 CSRF 可利用性",
+        "无部署/认证前置信息，无法确认脚本是否对外暴露",
+        "无数据库 schema，MD5 存储为基于代码与 DVWA 惯例的推断"
+      ],
+      "note": "单次 LLM 调用；请求体不含 tools/tool_choice/function calling；file_path 与行号由服务端校验，code_snippet 由真实源码回填。",
+      "rejected_count": 0,
+      "audited_files": [
+        "023.php"
+      ]
+    },
+    "policy_note": "本次档位 min_severity=low，min_confidence=0.6，抑制 0 条（suppressed_count=0，suppressed_by_type 为空）；无策略抑制项，但 coverage_gaps 中列出的未覆盖范围仍属未审计，不等于不存在漏洞。"
+  },
+  "limitations": [
+    "只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。",
+    "finding 的 verdict 为 candidate 或 external，不是动态确认。",
+    "POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。",
+    "规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。",
+    "AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。"
+  ]
+}

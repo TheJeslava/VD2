@@ -1,0 +1,30 @@
+# POC — 008.php 基于 Cookie 的角色标识可预测/可伪造（CWE-330/CWE-565）
+
+- finding_id: `SEM-e3f1dc6ea55d`
+- type: `weak_id` / CWE-330
+- severity: `high`
+- file: `008.php:94`
+
+## 步骤
+
+1. **确认目标可达且已获授权**  
+```http
+curl -sS -i 'http://TARGET:8080/008'
+```
+预期：返回应用页面/接口响应，而不是连接失败
+
+2. **在保持同一会话的情况下第一次 POST，记录 Set-Cookie**  
+```http
+curl -sS -i -b "${cookie_jar}" -c "${cookie_jar}" -X POST 'http://TARGET:8080/008' -H 'Content-Type: application/x-www-form-urlencoded'
+```
+预期：返回 dvwaSession 等会话 Cookie，记录其值
+
+3. **保持同一会话再次 POST，并比较两次会话 Cookie**  
+```http
+curl -sS -i -b "${cookie_jar}" -c "${cookie_jar}" -X POST 'http://TARGET:8080/008' -H 'Content-Type: application/x-www-form-urlencoded'
+```
+预期：Cookie 值出现连续递增/可预测序列
+
+## 安全说明
+
+POC 仅为文本工件；落日二号不会执行它，也不会联网或搭建沙箱。仅限授权测试。

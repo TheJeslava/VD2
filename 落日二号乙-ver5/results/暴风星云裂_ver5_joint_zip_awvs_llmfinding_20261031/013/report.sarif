@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.5.0-ver5",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/sql_injection",
+              "name": "SQL 注入",
+              "shortDescription": {
+                "text": "SQL 注入（CWE-89）"
+              },
+              "fullDescription": {
+                "text": "外部输入以字符串拼接方式进入 SQL 语句，改变查询语义。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "properties": {
+                "tags": [
+                  "sql_injection",
+                  "CWE-89",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/captcha_bypass",
+              "name": "验证码绕过",
+              "shortDescription": {
+                "text": "验证码绕过（CWE-804）"
+              },
+              "fullDescription": {
+                "text": "验证码绕过"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/804.html",
+              "properties": {
+                "tags": [
+                  "captcha_bypass",
+                  "CWE-804",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/weak_crypto",
+              "name": "弱加密算法",
+              "shortDescription": {
+                "text": "弱加密算法（CWE-327）"
+              },
+              "fullDescription": {
+                "text": "弱加密算法"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/327.html",
+              "properties": {
+                "tags": [
+                  "weak_crypto",
+                  "CWE-327",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-31T13:43:01.223536+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/sql_injection",
+          "level": "error",
+          "message": {
+            "text": "013.php 修改密码功能 SQL 注入（CWE-89）\n\n攻击者通过修改密码表单提交新口令，输入在 013.php:8 处由 query `password_new` 读取并赋给 $pass_new；013.php:26 仅用 mysqli_real_escape_string 做转义，随后 013.php:27 对 $pass_new 做 md5() 处理，013.php:30 将结果直接拼接进 UPDATE 语句：$insert = \"UPDATE `users` SET password = '$pass_new' WHERE user = '\" . dvwaCurrentUser() . \"' LIMIT 1;\"，最终在 013.php:31 由 mysqli_query 执行。由于 md5() 会把输入规整为 32 位十六进制串，单看 $pass_new 位置难以注入；但同一语句中 dvwaCurrentUser() 的返回值未经参数化直接拼入 WHERE 子句，若该函数返回可被外部影响的值（如会话中的用户名），则构成注入通道。当前 code_pack 未提供 dvwaCurrentUser() 的实现，无法确认其返回值是否可控，因此该注入点的可利用性证据不足。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "013.php"
+                },
+                "region": {
+                  "startLine": 29,
+                  "endLine": 31
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "GEN-89dab2f7ae60"
+          },
+          "properties": {
+            "finding_id": "GEN-89dab2f7ae60",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-89",
+            "endpoint": "/013",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/captcha_bypass",
+          "level": "error",
+          "message": {
+            "text": "DVWA 密码修改功能 CAPTCHA 校验可被伪造请求头绕过（013.php）\n\n013.php 在处理密码修改时，先调用 recaptcha_check_answer() 校验第三方 CAPTCHA，但随后在 if 条件中使用逻辑或 `$resp || (...)`，其中第二个分支仅要求 POST 参数 g-recaptcha-response 等于硬编码字符串 'hidd3n_valu3' 且 HTTP_USER_AGENT 等于 'reCAPTCHA'。攻击者无需真正通过 CAPTCHA，只要在请求中伪造这两个值即可让条件恒真，进入密码修改逻辑，从而在无有效 CAPTCHA 的情况下修改当前用户密码。该硬编码后门值（第20-21行）是根因，属于认证/校验机制绕过。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "013.php"
+                },
+                "region": {
+                  "startLine": 17,
+                  "endLine": 23
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-719de589f39a"
+          },
+          "properties": {
+            "finding_id": "LLM-719de589f39a",
+            "confidence": 0.9,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-804",
+            "endpoint": "/013.php",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/captcha_bypass",
+          "level": "error",
+          "message": {
+            "text": "013.php 修改密码流程验证码可绕过（CWE-804）\n\n013.php:3 判断 isset($_POST['Change']) 后，013.php:4-5 直接设置 $hide_form = true 并进入修改密码逻辑，代码片段中未见任何对验证码字段的读取、比对或会话校验。候选将其标记为验证码绕过，但 code_pack 仅给出 013.php:3-5 片段，未提供验证码生成/校验代码，无法确认是否存在验证码机制及其校验位置。原文证据仅为 013.php:4 注释 `// Hide the CAPTCHA form` 与 013.php:5 `$hide_form = true;`。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "013.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 4
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-07d9d737e404"
+          },
+          "properties": {
+            "finding_id": "SEM-07d9d737e404",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-804",
+            "endpoint": "/013",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        },
+        {
+          "ruleId": "sunset/weak_crypto",
+          "level": "warning",
+          "message": {
+            "text": "013.php 使用 MD5 存储口令哈希（CWE-328）\n\n013.php:27 执行 $pass_new = md5( $pass_new );，将用户新口令以无盐 MD5 形式计算后，于 013.php:30 拼入 UPDATE 语句写入 users 表 password 字段。MD5 为快速、无盐、已被证明存在碰撞的哈希算法，用于口令存储属弱哈希实现。原文证据：013.php:27 `$pass_new = md5( $pass_new );`，写入点 013.php:30 `UPDATE `users` SET password = '$pass_new' ...`。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "013.php"
+                },
+                "region": {
+                  "startLine": 26,
+                  "endLine": 27
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-0bafba96288b"
+          },
+          "properties": {
+            "finding_id": "SEM-0bafba96288b",
+            "confidence": 0.86,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-327",
+            "endpoint": "/013",
+            "http_method": "POST",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}

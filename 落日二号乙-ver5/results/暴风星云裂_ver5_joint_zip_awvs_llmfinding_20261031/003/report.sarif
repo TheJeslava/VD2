@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "落日二号乙 / Sunset Two Beta",
+          "version": "1.5.0-ver5",
+          "informationUri": "https://sunset-one.local",
+          "rules": [
+            {
+              "id": "sunset/xss",
+              "name": "跨站脚本",
+              "shortDescription": {
+                "text": "跨站脚本（CWE-79）"
+              },
+              "fullDescription": {
+                "text": "外部输入未编码进入 HTML/JS 上下文，可在受害者浏览器执行脚本。"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html",
+              "properties": {
+                "tags": [
+                  "xss",
+                  "CWE-79",
+                  "security"
+                ]
+              }
+            },
+            {
+              "id": "sunset/api_info_disclosure",
+              "name": "API 信息泄露",
+              "shortDescription": {
+                "text": "API 信息泄露（CWE-200）"
+              },
+              "fullDescription": {
+                "text": "API 信息泄露"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/200.html",
+              "properties": {
+                "tags": [
+                  "api_info_disclosure",
+                  "CWE-200",
+                  "security"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-31T13:40:41.712526+00:00",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "sunset/xss",
+          "level": "error",
+          "message": {
+            "text": "003.php 反射型 XSS：REQUEST_URI 未编码直接拼入内联 <script> 的 JS 字符串\n\n脚本在第 3 行读取 $_SERVER['REQUEST_URI']，第 4 行仅用 str_replace 删除字面量 \"/vulnerabilities/api/\"，随后在第 31 行与第 51 行把结果 $stripped_url 直接拼接进内联 <script> 中的单引号 JS 字符串（const url = '\" . $stripped_url . \"/vulnerabilities/api/v2/user/2';）。全程没有 htmlspecialchars、json_encode、urlencode 或任何 JS 字符串转义。攻击者只要在请求 URI 中放入单引号即可闭合 JS 字符串并注入任意 JavaScript，脚本在页面加载时（第 94 行 get_user()）即执行，构成反射型 XSS。由于该页面本身是 API 用户管理界面（可 PUT 修改用户 name/level），XSS 可用于以受害者身份调用 /vulnerabilities/api/v2/user/2 提权或窃取数据。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "003.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 31
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "LLM-1e0cbcf971b5"
+          },
+          "properties": {
+            "finding_id": "LLM-1e0cbcf971b5",
+            "confidence": 0.85,
+            "verdict": "candidate",
+            "evidence_level": "llm_inferred",
+            "cwe": "CWE-79",
+            "endpoint": "/003.php",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "llm_finding"
+          }
+        },
+        {
+          "ruleId": "sunset/api_info_disclosure",
+          "level": "error",
+          "message": {
+            "text": "003.php 基于 REQUEST_URI 的路径处理与 API 信息暴露（CWE-200）\n\n证据仅覆盖 003.php 第 3-4 行：第 3 行 `$request_url = $_SERVER['REQUEST_URI'];` 把客户端可控的请求 URI（含路径与查询串）读入变量；第 4 行 `$stripped_url = str_replace(\"/vulnerabilities/api/\", \"\", $request_url);` 仅做一次字面量字符串替换，把 `/vulnerabilities/api/` 从 URI 中删除，结果存入 `$stripped_url`。输入中未提供第 4 行之后如何使用 `$stripped_url`（是否拼接文件路径、是否回显、是否用于路由分发或日志），因此从 source 到危险汇点的链路在证据层面是断开的。可确认的技术事实是：该端点以请求 URI 作为唯一输入，且只做非规范化、非白名单的字面量替换，未对 `..`、URL 编码（`%2e%2e%2f`）、重复斜杠、大小写变体做规范化处理，也未做任何鉴权判断的可见代码。攻击者输入点：HTTP 请求行中的 URI（路径段与查询串）。经过变量：`$_SERVER['REQUEST_URI']` → `$request_url` → `str_replace` → `$stripped_url`。校验为何无效：`str_replace` 是纯文本替换，不是路径规范化，无法阻止编码绕过或前缀伪造；且替换后剩余内容未做任何合法性校验。最终危险操作：证据不足——第 4 行之后的下游使用未在 code_pack 中给出，无法确认是文件读取、响应回显还是路由跳转。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "003.php"
+                },
+                "region": {
+                  "startLine": 3,
+                  "endLine": 4
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sunsetFindingId": "SEM-b5ee97e20ce3"
+          },
+          "properties": {
+            "finding_id": "SEM-b5ee97e20ce3",
+            "confidence": 0.4,
+            "verdict": "candidate",
+            "evidence_level": "rule_verified+llm",
+            "cwe": "CWE-200",
+            "endpoint": "/003",
+            "http_method": "GET",
+            "has_poc": true,
+            "origin": "rule"
+          }
+        }
+      ]
+    }
+  ]
+}
