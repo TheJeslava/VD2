@@ -85,13 +85,13 @@ class TestPythonLogic(unittest.TestCase):
                 self.assertEqual(assess(body)["status"], "needs_context")
         self.assertEqual(assess("return store.change_password(body['password'])", context_complete=False)["status"], "needs_context")
 
-    def test_business_constraint_accepts_equivalent_fail_closed_comparison(self):
+    def test_untyped_inverse_comparison_requires_numeric_context(self):
         body = "quantity = body['quantity']\nif quantity <= 0:\n    return 403\nreturn store.purchase(quantity)"
         self.assertEqual(assess(body, category="business_constraint", operation="store.purchase",
-                                required_condition="quantity > 0", trusted_inputs=[], operation_bindings={"0": "quantity"})["status"], "guarded")
+                                required_condition="quantity > 0", trusted_inputs=[], operation_bindings={"0": "quantity"})["status"], "needs_context")
 
     def test_validated_amount_reassigned_or_unused_is_not_guarded(self):
-        start = "quantity = body['quantity']\nif quantity <= 0:\n    return 403\n"
+        start = "quantity = body['quantity']\nif not (quantity > 0):\n    return 403\n"
         for tail, expected in [("quantity = body['other_quantity']\nreturn store.purchase(quantity)", "candidate"),
                                ("return store.purchase(body['quantity'])", "needs_context")]:
             with self.subTest(tail=tail):
@@ -138,7 +138,7 @@ class TestPythonLogic(unittest.TestCase):
         self.assertEqual(result["status"], "needs_context")
 
     def test_keyword_binding_supported_and_checked(self):
-        body = "quantity = body['quantity']\nif quantity <= 0:\n    return 403\nreturn store.purchase(amount=quantity)"
+        body = "quantity = body['quantity']\nif not (quantity > 0):\n    return 403\nreturn store.purchase(amount=quantity)"
         options = dict(category="business_constraint", operation="store.purchase",
                        required_condition="quantity > 0", trusted_inputs=[], operation_bindings={"amount": "quantity"})
         self.assertEqual(assess(body, **options)["status"], "guarded")
@@ -146,8 +146,8 @@ class TestPythonLogic(unittest.TestCase):
 
     def test_required_conjunction_needs_both_conditions(self):
         options = dict(category="business_constraint", operation="store.purchase", required_condition="quantity > 0 and quantity <= 10", trusted_inputs=[], operation_bindings={"0": "quantity"})
-        self.assertEqual(assess("quantity=body['quantity']\nif quantity <= 0 or quantity > 10:\n    return 403\nreturn store.purchase(quantity)", **options)["status"], "guarded")
-        self.assertEqual(assess("quantity=body['quantity']\nif quantity <= 0:\n    return 403\nreturn store.purchase(quantity)", **options)["status"], "candidate")
+        self.assertEqual(assess("quantity=body['quantity']\nif not (quantity > 0 and quantity <= 10):\n    return 403\nreturn store.purchase(quantity)", **options)["status"], "guarded")
+        self.assertEqual(assess("quantity=body['quantity']\nif not (quantity > 0):\n    return 403\nreturn store.purchase(quantity)", **options)["status"], "candidate")
 
     def test_unsupported_policy_disjunction_never_becomes_empty_proof(self):
         self.assertEqual(assess("return store.change_password(body['password'])",

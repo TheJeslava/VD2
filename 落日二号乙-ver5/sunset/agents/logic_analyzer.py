@@ -128,11 +128,18 @@ class LogicAnalyzerAgent(BaseAgent):
                      "missing_evidence": a["missing_evidence"]}
                     for a in assessments if a["file"] not in ctx.quarantined][:20]
         if dossiers and ctx.llm and ctx.llm.available:
-            data = self._llm_json(ctx, {"assessments": dossiers}, label="business_logic", max_chars=24000)
+            try:
+                data = self._llm_json(ctx, {"assessments": dossiers}, label="business_logic", max_chars=24000)
+            except Exception as exc:  # optional review must not discard static evidence
+                data = None
+                message = f"可选模型复核失败（{type(exc).__name__}），保留确定性判定"
+                result.errors.append(message)
+                ctx.log(self.name, message)
             patches = data.get("reviews") if isinstance(data, dict) else None
             if isinstance(patches, list):
                 result.used_llm = True
-                by_id = {a["assessment_id"]: a for a in assessments if a["file"] not in ctx.quarantined}
+                submitted_ids = {a["assessment_id"] for a in dossiers}
+                by_id = {a["assessment_id"]: a for a in assessments if a["assessment_id"] in submitted_ids}
                 for patch in patches[:20]:
                     if not isinstance(patch, dict):
                         continue
@@ -154,9 +161,10 @@ class LogicAnalyzerAgent(BaseAgent):
                     severity_order.get(finding.severity, 0) < severity_order.get(ctx.settings.min_severity, 0)):
                 assessment["finding_suppressed"] = "min_confidence/min_severity"
                 continue
-            # 仅合并同类型、同文件、同操作附近的候选；不因某个保护条件存在就删除其他发现。
-            matches = [f for f in ctx.findings if f.vulnerability_type == finding.vulnerability_type
-                       and f.file_path == finding.file_path and abs(f.line_end - finding.line_end) <= 3]
+            # 代码位置接近并不证明同一业务规则。只合并相同判定 ID，
+            # 或下方可溯源到单一 PHP 工作流的旧通用提示。
+            matches = [f for f in ctx.findings if f.origin == "logic_specialist"
+                       and f.finding_id == finding.finding_id]
             if (assessment.get("policy_source") == "inferred_local_workflow"
                     and php_workflows_per_file[finding.file_path] == 1):
                 for existing in ctx.findings:

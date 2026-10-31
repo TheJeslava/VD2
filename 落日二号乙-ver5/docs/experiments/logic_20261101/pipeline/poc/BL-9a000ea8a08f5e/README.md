@@ -1,9 +1,9 @@
-# POC — 隐性逻辑：本实验购买数量必须为正整数；传输层验证整数类型，本规则验证正数边界。
+# POC — 隐性逻辑：修改密码前必须检查服务端验证状态，不能信任请求中的 passed_captcha。
 
-- finding_id: `BL-f684092735152a`
+- finding_id: `BL-9a000ea8a08f5e`
 - type: `business_logic` / CWE-840
 - severity: `high`
-- file: `vulnerable.py:26`
+- file: `vulnerable.py:14`
 
 ## 步骤
 

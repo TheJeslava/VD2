@@ -1,9 +1,9 @@
-# POC — 隐性逻辑：修改密码前必须检查服务端验证状态，不能信任请求中的 passed_captcha。
+# POC — 隐性逻辑：本实验禁止用户修改其他用户的订单；服务端身份与持久化订单归属必须相同。
 
-- finding_id: `BL-c8e9c322b24dac`
-- type: `business_logic` / CWE-840
+- finding_id: `BL-06534c8b875e71`
+- type: `idor` / CWE-639
 - severity: `high`
-- file: `vulnerable.py:14`
+- file: `vulnerable.py:20`
 
 ## 步骤
 

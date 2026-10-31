@@ -1,6 +1,6 @@
 # POC — 隐性逻辑：修改密码前必须由服务端记录当前会话已通过验证；仅针对本次操作。
 
-- finding_id: `BL-830c199052da9d`
+- finding_id: `BL-c4d7a718d97e93`
 - type: `business_logic` / CWE-840
 - severity: `high`
 - file: `vulnerable.py:6`

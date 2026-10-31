@@ -23,6 +23,13 @@ class CoordinatorAgent(BaseAgent):
         for finding in ctx.findings:
             duplicate = None
             for existing in deduped:
+                if "logic_specialist" in {existing.origin, finding.origin}:
+                    # Distinct policy/operation assessments remain independent,
+                    # even when two checks point at the very same source line.
+                    if existing.finding_id == finding.finding_id:
+                        duplicate = existing
+                        break
+                    continue
                 if existing.vulnerability_type != finding.vulnerability_type:
                     continue
                 if existing.origin == "awvs" or existing.file_path == "" or finding.file_path == "":

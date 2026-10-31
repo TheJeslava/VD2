@@ -25,7 +25,7 @@ CATEGORIES = {
 def _assessment(policy: dict, text: str, line: int = 1, **extra: Any) -> dict:
     lines = text.splitlines()
     line = min(max(1, line), max(1, len(lines)))
-    key = f"{policy.get('id')}:{policy.get('file')}:{line}"
+    key = f"{policy.get('id')}:{policy.get('file')}:{line}:{extra.get('column', 0)}"
     result = {
         "assessment_id": "BL-" + hashlib.sha256(key.encode()).hexdigest()[:14],
         "category": policy.get("category", "workflow_bypass"),
@@ -69,8 +69,11 @@ def _call_name(call: ast.Call) -> str:
 
 
 _INVERSE = {ast.Eq: ast.NotEq, ast.NotEq: ast.Eq, ast.Is: ast.IsNot, ast.IsNot: ast.Is,
-            ast.Lt: ast.GtE, ast.LtE: ast.Gt, ast.Gt: ast.LtE, ast.GtE: ast.Lt,
             ast.In: ast.NotIn, ast.NotIn: ast.In}
+
+# Negating x <= 0 does not prove x > 0 for NaN or custom comparison objects.
+_EXPRESSION_CONTROL = (ast.IfExp, ast.NamedExpr, ast.Lambda, ast.comprehension,
+                       ast.Await, ast.Yield, ast.YieldFrom)
 
 
 def _facts(node: ast.AST, truth: bool = True) -> set[str]:
@@ -96,7 +99,7 @@ def _supported_condition(node: ast.AST) -> bool:
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
         return _supported_condition(node.operand)
     if isinstance(node, ast.Compare):
-        return len(node.ops) == 1 and not any(isinstance(n, (ast.NamedExpr, ast.Lambda, ast.IfExp)) for n in ast.walk(node))
+        return len(node.ops) == 1 and not any(isinstance(n, _EXPRESSION_CONTROL) for n in ast.walk(node))
     return isinstance(node, (ast.Name, ast.Subscript, ast.Attribute))
 
 
@@ -119,21 +122,31 @@ class _PythonCheck:
         self.depends = _names(condition)
         self.trusted = set(policy.get("trusted_inputs", []))
         self.operation = policy["operation"]
-        self.observations: dict[int, list[_State]] = {}
+        self.receiver = self.operation.split(".", 1)[0]
+        self.observations: dict[tuple[int, int], list[_State]] = {}
+
+    def read_call(self, call: ast.Call, state: _State) -> bool:
+        """Only the supported dictionary/service reads, never an arbitrary .get()."""
+        if not isinstance(call.func, ast.Attribute):
+            return False
+        base = _root(call.func.value)
+        if call.func.attr == "get":
+            return base in self.trusted | {"body", "request", "form", "params"}
+        return _call_name(call) == self.receiver + ".get_order"
 
     def record(self, node: ast.AST, states: list[_State], *, uncertain: bool = False) -> None:
         calls = [n for n in ast.walk(node) if isinstance(n, ast.Call)]
         # Evaluation order inside an expression is outside the statement checker.
         # In particular (session.clear(), protected_operation()) must not inherit
         # a guard proved before the clear().
-        complex_call = len(calls) > 1 and any(
-            _call_name(c) != self.operation and _call_name(c) not in {"int", "str", "float", "bool", "len"}
-            and not (isinstance(c.func, ast.Attribute) and c.func.attr == "get") for c in calls)
         for call in ast.walk(node):
             if isinstance(call, ast.Call) and _call_name(call) == self.operation:
                 for state in states:
                     copy = state.copy()
-                    if uncertain or complex_call:
+                    complex_call = len(calls) > 1 and any(
+                        _call_name(c) != self.operation and not self.read_call(c, state) for c in calls)
+                    multiple_operations = sum(_call_name(c) == self.operation for c in calls) > 1
+                    if uncertain or complex_call or multiple_operations:
                         copy.gaps.add("操作位于当前分析器未完整建模的控制流中")
                     # An owner/quantity guard protects the value checked, not a
                     # fresh request value used in its place at the operation.
@@ -159,7 +172,7 @@ class _PythonCheck:
                                 copy.gaps.add("operation_bindings 包含无效的参数映射")
                         if not relevant <= bound_names:
                             copy.gaps.add("操作参数映射未覆盖规则检查的对象/数值，需要补充数据流映射")
-                    self.observations.setdefault(call.lineno, []).append(copy)
+                    self.observations.setdefault((call.lineno, call.col_offset), []).append(copy)
 
     def mutate(self, node: ast.AST, states: list[_State]) -> None:
         targets: list[ast.AST] = []
@@ -180,10 +193,8 @@ class _PythonCheck:
                 continue
             # Helpers may enforce or mutate business state. Without their body we
             # cannot claim either a bypass or a valid guard.
-            pure = _call_name(call) in {"int", "str", "float", "bool", "len"}
-            read = isinstance(call.func, ast.Attribute) and call.func.attr in {"get", "get_order"}
-            if not pure and not read:
-                for state in states:
+            for state in states:
+                if not self.read_call(call, state):
                     state.gaps.add("存在未建模的辅助调用，需要确认其校验和副作用")
             if isinstance(call.func, ast.Attribute) and call.func.attr not in {"get", "get_order"}:
                 base = _root(call.func.value)
@@ -198,6 +209,11 @@ class _PythonCheck:
                     state.facts.clear()
                     state.gaps.add("可信对象传入未建模的辅助调用，需要确认其副作用")
         for state in states:
+            if writes & {"body", "request", "form", "params"}:
+                state.gaps.add("请求读取对象被重新赋值，不能继续假定其 get 方法是字典读取")
+            if self.receiver in writes:
+                state.facts.clear()
+                state.gaps.add("敏感操作的服务对象被重新绑定，调用语义需要复核")
             if writes & (self.depends | state.aliases):
                 state.facts.clear()
             for name in writes & self.trusted:
@@ -210,8 +226,9 @@ class _PythonCheck:
                     if not lookup:
                         state.gaps.add(f"声明可信的 {name} 实际从客户端输入赋值")
             if value is not None and _names(value) & (self.trusted | state.aliases):
-                if isinstance(value, (ast.Name, ast.Attribute, ast.Subscript)):
-                    state.aliases.update(writes)
+                # get() and shallow containers can expose the same nested
+                # mutable object, so their aliases also invalidate this proof.
+                state.aliases.update(writes)
             if writes & state.aliases:
                 state.gaps.add("可信对象存在别名写入，需要补充数据流分析")
             # Preserve input origin through renamed dictionaries and simple
@@ -221,16 +238,29 @@ class _PythonCheck:
                 if not lookup:
                     state.untrusted.update(writes)
             state.assigned.update(writes)
+            if any(isinstance(c, ast.Call) and _call_name(c) == self.operation for c in ast.walk(node)):
+                state.facts.clear()
+                state.gaps.add("前一次敏感操作可能改变业务状态；后续操作需要重新确认")
 
     def walk(self, statements: list[ast.stmt], states: list[_State]) -> list[_State]:
         for stmt in statements:
             if not states:
                 break
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                # Defaults, decorators and class bodies can execute now, even
+                # when the newly defined function is never invoked.
+                for state in states:
+                    state.facts.clear()
+                    state.gaps.add("嵌套定义的默认值、装饰器或类体执行效果未建模")
                 continue
             if isinstance(stmt, ast.If):
                 self.record(stmt.test, states, uncertain=True)
                 self.mutate(stmt.test, states)
+                complex_test = any(isinstance(n, _EXPRESSION_CONTROL) for n in ast.walk(stmt.test))
+                if complex_test:
+                    for state in states:
+                        state.facts.clear()
+                        state.gaps.add("条件表达式含赋值或未建模的求值顺序，不能沿用已有检查")
                 branches = []
                 for truth, body in ((True, stmt.body), (False, stmt.orelse)):
                     if isinstance(stmt.test, ast.Constant) and bool(stmt.test.value) != truth:
@@ -239,7 +269,11 @@ class _PythonCheck:
                     copies = [state.copy() for state in states
                               if not (len(opposite) == 1 and opposite <= state.facts.keys())]
                     for state in copies:
-                        state.facts.update({fact: stmt.lineno for fact in _facts(stmt.test, truth)})
+                        branch_facts = _facts(stmt.test, truth)
+                        if any(fact.startswith("F:Compare(") and any(token in fact for token in
+                               ("Lt()", "LtE()", "Gt()", "GtE()")) for fact in branch_facts):
+                            state.gaps.add("数值类型未确定，不能将大小比较失败推导为相反比较成立（例如 NaN）")
+                        state.facts.update({fact: stmt.lineno for fact in branch_facts})
                     branches.extend(self.walk(body, copies))
                 states = branches
             elif isinstance(stmt, (ast.Return, ast.Raise)):
@@ -282,7 +316,7 @@ class _PythonCheck:
         self.walk(self.function.body, [initial])
         results = []
         lines = self.text.splitlines()
-        for line, states in sorted(self.observations.items()):
+        for (line, column), states in sorted(self.observations.items()):
             gaps = sorted(set().union(*(state.gaps for state in states)))
             protected = all(self.required <= state.facts.keys() for state in states)
             if not self.policy.get("context_complete", False):
@@ -299,11 +333,39 @@ class _PythonCheck:
             evidence.append({"line": line, "code": lines[line - 1], "role": "operation"})
             results.append(_assessment(self.policy, self.text, line, status=status, confidence=confidence,
                                        reason=reason, evidence=evidence, missing_evidence=gaps,
-                                       scope_start=self.function.lineno, scope_end=self.function.end_lineno))
+                                       scope_start=self.function.lineno, scope_end=self.function.end_lineno,
+                                       column=column))
         return results
 
 
 def _python_policy(policy: dict, contents: dict[str, str]) -> list[dict]:
+    # Standalone callers bypass the CLI loader. Fail closed on invalid shapes
+    # instead of accepting truthy strings or raising on unhashable file names.
+    invalid = []
+    for key in ("id", "category", "file", "function", "operation", "required_condition"):
+        if not isinstance(policy.get(key), str) or not policy[key].strip():
+            invalid.append(f"策略 {key} 必须是非空字符串")
+    if type(policy.get("context_complete", False)) is not bool:
+        invalid.append("context_complete 必须是布尔值，不能用字符串或数字声明可信上下文")
+    trusted = policy.get("trusted_inputs", [])
+    if not isinstance(trusted, list) or not all(isinstance(x, str) and x.isidentifier() for x in trusted):
+        invalid.append("trusted_inputs 必须是标识符数组")
+    bindings = policy.get("operation_bindings", {})
+    if not isinstance(bindings, dict):
+        invalid.append("operation_bindings 必须是参数映射对象")
+    else:
+        for position, expression in bindings.items():
+            if (not isinstance(position, str) or not (position.isdecimal() or position.isidentifier())
+                    or not isinstance(expression, str) or not expression.strip()):
+                invalid.append("operation_bindings 的参数名和表达式必须是有效字符串")
+                continue
+            try:
+                ast.parse(expression, mode="eval")
+            except (SyntaxError, ValueError, RecursionError):
+                invalid.append("operation_bindings 的表达式无法解析")
+    if invalid:
+        safe = {key: value for key, value in policy.items() if isinstance(value, str)}
+        return [_assessment(safe, "", reason="策略输入类型或参数映射无效。", missing_evidence=invalid)]
     text = contents.get(str(policy.get("file", "")), "")
     missing = []
     if policy.get("file") not in contents:
@@ -347,16 +409,71 @@ def _python_policy(policy: dict, contents: dict[str, str]) -> list[dict]:
 
 
 def _php_views(text: str) -> tuple[str, str]:
-    """Preserve offsets/newlines; code view masks literals as well as comments."""
+    """Lexical views with original offsets; never interpret HTML/literal bodies.
+
+    The first view retains ordinary SQL string literals. Both views mask HTML,
+    comments and heredoc/nowdoc bodies; the second also masks quoted strings.
+    This is a bounded lexer, not a PHP parser. Short tags are deliberately not
+    assumed enabled. Unterminated literals consume the remainder conservatively.
+    """
     cleaned, code = list(text), list(text)
-    token = re.compile(r"//[^\n]*|\#[^\n]*|/\*[\s\S]*?\*/|'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"")
-    for match in token.finditer(text):
-        is_comment = match.group().startswith(("//", "#", "/*"))
-        for i in range(match.start(), match.end()):
-            if text[i] not in "\r\n":
-                code[i] = " "
-                if is_comment:
-                    cleaned[i] = " "
+    def mask(start: int, end: int, *, both: bool = True) -> None:
+        for index in range(start, end):
+            if text[index] not in "\r\n":
+                code[index] = " "
+                if both:
+                    cleaned[index] = " "
+
+    opening_tag = re.compile(r"<\?(?:php\b|=)", re.I)
+    heredoc = re.compile(r"<<<[ \t]*(?:([\"'])([A-Za-z_]\w*)\1|([A-Za-z_]\w*))[ \t]*\r?\n")
+    pos, in_php = 0, False
+    while pos < len(text):
+        if not in_php:
+            tag = opening_tag.search(text, pos)
+            if tag is None:
+                mask(pos, len(text))
+                break
+            mask(pos, tag.end())
+            pos, in_php = tag.end(), True
+        elif text.startswith("?>", pos):
+            mask(pos, pos + 2)
+            pos, in_php = pos + 2, False
+        elif text.startswith("/*", pos):
+            end = text.find("*/", pos + 2)
+            end = len(text) if end < 0 else end + 2
+            mask(pos, end)
+            pos = end
+        elif text.startswith("//", pos) or text[pos] == "#":
+            # PHP closing tags also end a single-line comment.
+            newline, close_tag = text.find("\n", pos), text.find("?>", pos)
+            ends = [n for n in (newline, close_tag) if n >= 0]
+            end = min(ends) if ends else len(text)
+            mask(pos, end)
+            pos = end
+        elif text.startswith("<<<", pos):
+            start = heredoc.match(text, pos)
+            end = len(text)
+            if start is not None:
+                label = start.group(2) or start.group(3)
+                closing = re.compile(r"^[ \t]*" + re.escape(label) + r"(?!\w)", re.M).search(text, start.end())
+                if closing is not None:
+                    end = closing.end()
+            mask(pos, end)
+            pos = end
+        elif text[pos] in "'\"`":
+            quote, end = text[pos], pos + 1
+            while end < len(text):
+                if text[end] == "\\":
+                    end = min(len(text), end + 2)
+                elif text[end] == quote:
+                    end += 1
+                    break
+                else:
+                    end += 1
+            mask(pos, end, both=quote == "`")
+            pos = end
+        else:
+            pos += 1
     return "".join(cleaned), "".join(code)
 
 
@@ -372,12 +489,45 @@ def _closing(code: str, start: int, left: str, right: str) -> int:
     return -1
 
 
+def _php_brace_scope(code: str, end: int) -> tuple[int, ...]:
+    stack: list[int] = []
+    for index, char in enumerate(code[:end]):
+        if char == "{":
+            stack.append(index)
+        elif char == "}" and stack:
+            stack.pop()
+    return tuple(stack)
+
+
+def _php_terminated_before(code: str, target: int) -> bool:
+    """Only direct terminating statements in the target's own/ancestor scope."""
+    target_scope = _php_brace_scope(code, target)
+    for match in re.finditer(r"(?:^|[;{}])\s*(return\b|throw\b|(?:exit|die)\s*(?:\(|;))", code[:target]):
+        scope = _php_brace_scope(code, match.start(1))
+        if target_scope[:len(scope)] == scope:
+            return True
+    return False
+
+
+def _php_false_condition(condition: str) -> bool:
+    # Recognize only unambiguous literals / AND-only false conditions. OR and
+    # ternary expressions need a proper parser and must not be simplified here.
+    value = condition.strip().lower()
+    while value.startswith("(") and _closing(value, 0, "(", ")") == len(value) - 1:
+        value = value[1:-1].strip()
+    if value in {"false", "0"}:
+        return True
+    return (not re.search(r"\|\||\bor\b|\?", value)
+            and bool(re.match(r"(?:false|0)\s*(?:&&|\band\b)", value)))
+
+
 def _php_captcha(rel: str, text: str) -> list[dict]:
     cleaned, code = _php_views(text)
     checks = list(re.finditer(r"\b(?:recaptcha_check_answer|captcha_verify|verify_captcha)\s*\(", code, re.I))
     if not checks:
         return []
     branches = []
+    if_blocks = []
     for match in re.finditer(r"\bif\s*\(", code):
         start = code.index("(", match.start())
         end = _closing(code, start, "(", ")")
@@ -389,19 +539,26 @@ def _php_captcha(rel: str, text: str) -> list[dict]:
         opening = end + 1 + block.end() - 1
         closing = _closing(code, opening, "{", "}")
         condition = cleaned[start + 1:end]
-        step = re.search(r"\$_(?:POST|GET|REQUEST)\s*\[\s*['\"]step['\"]\s*\]\s*==\s*['\"]?(\d+)", condition)
+        if closing >= 0:
+            if_blocks.append((match.start(), opening, closing, condition))
+        step = re.search(r"\$_(?:POST|GET|REQUEST)\s*\[\s*['\"]step['\"]\s*\]\s*={2,3}(?!=)\s*['\"]?(\d+)", condition)
         if closing >= 0 and step:
             branches.append((match.start(), opening, closing, step.group(1)))
     results = []
     for start, opening, closing, step in branches:
         # Only infer the intended workflow when a different request branch actually
         # invokes CAPTCHA verification. A mention in HTML/comments is insufficient.
-        earlier = [b for b in branches if b[3] != step and b[2] < start and any(b[1] < c.start() < b[2] for c in checks)]
+        earlier = [b for b in branches if b[3] != step and b[2] < start and any(b[1] < c.start() < b[2] for c in checks)
+                   and not any(block[1] <= b[1] < block[2] and _php_false_condition(block[3]) for block in if_blocks)]
         if not earlier:
             continue
         body = cleaned[opening + 1:closing]
         body_code = code[opening + 1:closing]
-        assignment = re.search(r"(\$\w+)\s*=\s*['\"]\s*UPDATE\s+`?\w+`?\s+SET\s+`?password`?\s*=", body, re.I)
+        assignments = re.finditer(r"(\$\w+)\s*=\s*['\"]\s*UPDATE\s+`?\w+`?\s+SET\s+`?password`?\s*=", body, re.I)
+        # Retained SQL text can contain example code. Its assignment prefix must
+        # also be visible in the code-only view, rather than inside a string.
+        assignment = next((m for m in assignments
+                           if body_code[m.start():m.start() + len(m.group(1))] == m.group(1)), None)
         if not assignment:
             continue
         execution = re.search(r"\b(?:mysqli_query|mysql_query|query|exec)\s*\([^;]*?" + re.escape(assignment.group(1)) + r"\b", body_code[assignment.end():], re.I)
@@ -409,6 +566,9 @@ def _php_captcha(rel: str, text: str) -> list[dict]:
             continue
         sql_pos = opening + 1 + assignment.start()
         op_pos = opening + 1 + assignment.end() + execution.start()
+        if (_php_terminated_before(code, op_pos)
+                or any(b[1] < op_pos < b[2] and _php_false_condition(b[3]) for b in if_blocks)):
+            continue
         line = text[:op_pos].count("\n") + 1
         scope_start, scope_end = text[:start].count("\n") + 1, text[:closing].count("\n") + 1
         prefix_code, prefix = code[:op_pos], cleaned[:op_pos]
@@ -435,6 +595,25 @@ def _php_captcha(rel: str, text: str) -> list[dict]:
         helpers = {m.group(1) for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", code[opening + 1:op_pos])} - allowed_calls
         if helpers:
             gaps.append("最终分支有未建模的辅助调用：" + ", ".join(sorted(helpers)))
+        # Include earlier global guards, while excluding completed, mutually
+        # exclusive step branches (the ordinary CAPTCHA stage is one of these).
+        outside = list(code[:opening])
+        for branch in branches:
+            if branch[2] >= start or branch[3] == step:
+                continue
+            condition = next(b[3] for b in if_blocks if b[0] == branch[0])
+            if re.search(r"\|\||\bor\b|\?", condition, re.I):
+                continue
+            outside[branch[0]:branch[2] + 1] = " " * (branch[2] + 1 - branch[0])
+        outside_code = "".join(outside)
+        outer_helpers = {m.group(1) for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", outside_code)} - allowed_calls
+        if outer_helpers:
+            gaps.append("外层存在未建模的前置校验/辅助调用：" + ", ".join(sorted(outer_helpers)))
+        if (any(b[1] < start < b[2] for b in if_blocks)
+                or re.search(r"\b(?:return|throw|exit|die)\b", outside_code)):
+            gaps.append("最终步骤存在外层条件或条件终止路径，需要核对入口保护")
+        if re.search(r"(?<![$\w])(?:goto|try|catch|finally|switch|case|match|yield)\b", code[opening + 1:op_pos]):
+            gaps.append("最终分支包含未建模的 PHP 控制流，需要补充可达性分析")
         # Session gating of the whole script also deserves review, not a bypass claim.
         if "$_SESSION" in prefix_code[:opening] and re.search(r"\bif\s*\(", prefix_code[:opening]):
             gaps.append("外层会话条件可能保护整个脚本，需完整路径核对")

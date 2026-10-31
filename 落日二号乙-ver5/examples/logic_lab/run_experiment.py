@@ -36,7 +36,8 @@ def _request(base, path, body, session="alice-demo"):
 
 
 def _cases():
-    verify = ("/verify", {"answer": "demo-ok"}, "alice-demo")
+    verify = {"path": "/verify", "body": {"answer": "demo-ok"}, "session": "alice-demo",
+              "expected_status": 200, "expected_captcha": True, "expected_store_change": False}
     return [
         {"id": "workflow_direct", "category": "workflow_bypass", "path": "/password",
          "body": {"password": "changed"}, "vulnerable": True, "fixed": False},
@@ -50,13 +51,17 @@ def _cases():
          "setup": [verify], "body": {"password": "changed", "passed_captcha": True},
          "vulnerable": True, "fixed": True},
         {"id": "workflow_wrong_verification", "category": "workflow_bypass", "path": "/password",
-         "setup": [("/verify", {"answer": "wrong"}, "alice-demo")],
+         "setup": [{"path": "/verify", "body": {"answer": "wrong"}, "session": "alice-demo",
+                    "expected_status": 403, "expected_captcha": False, "expected_store_change": False}],
          "body": {"password": "changed"}, "vulnerable": True, "fixed": False},
         {"id": "workflow_other_session", "category": "workflow_bypass", "path": "/password",
-         "setup": [("/verify", {"answer": "demo-ok"}, "bob-demo")],
+         "setup": [{"path": "/verify", "body": {"answer": "demo-ok"}, "session": "bob-demo",
+                    "expected_status": 200, "expected_captcha": True, "expected_store_change": False}],
          "body": {"password": "changed"}, "vulnerable": True, "fixed": False},
         {"id": "workflow_replay", "category": "workflow_bypass", "path": "/password",
-         "setup": [verify, ("/password", {"password": "first-change"}, "alice-demo")],
+         "setup": [verify, {"path": "/password", "body": {"password": "first-change"}, "session": "alice-demo",
+                            "expected_status": 200, "expected_captcha": {"vulnerable": True, "fixed": False},
+                            "expected_store_change": True}],
          "body": {"password": "second-change"}, "vulnerable": True, "fixed": False},
         {"id": "object_other_order", "category": "object_authorization", "path": "/order",
          "body": {"order_id": "202", "memo": "changed"}, "vulnerable": True, "fixed": False},
@@ -100,20 +105,40 @@ def run_dynamic():
         for case in _cases():
             with running_lab(variant) as (lab, base):
                 setup_log = []
-                for path, body, session in case.get("setup", []):
-                    status, _ = _request(base, path, body, session)
-                    setup_log.append({"path": path, "session": session, "body": body, "http_status": status})
+                for step in case.get("setup", []):
+                    path, body, session = step["path"], step["body"], step["session"]
+                    state_before = lab.store.snapshot()
+                    sessions_before = copy.deepcopy(lab.sessions)
+                    expected_state = _expected_state(state_before, path, body, session, step["expected_store_change"])
+                    expected_sessions = copy.deepcopy(sessions_before)
+                    expected_captcha = step["expected_captcha"]
+                    if isinstance(expected_captcha, dict):
+                        expected_captcha = expected_captcha[variant]
+                    expected_sessions[session]["captcha_passed"] = expected_captcha
+                    status, response = _request(base, path, body, session)
+                    state_after = lab.store.snapshot()
+                    sessions_after = copy.deepcopy(lab.sessions)
+                    setup_passed = (status == step["expected_status"] and state_after == expected_state
+                                    and sessions_after == expected_sessions)
+                    setup_log.append({
+                        "path": path, "session": session, "body": body, "http_status": status,
+                        "response_body": response, "expected_http_status": step["expected_status"],
+                        "state_before": state_before, "state_after": state_after, "expected_state_after": expected_state,
+                        "sessions_before": sessions_before, "sessions_after": sessions_after,
+                        "expected_sessions_after": expected_sessions, "passed": setup_passed,
+                    })
                 before = lab.store.snapshot()
                 session = case.get("session", "alice-demo")
                 status, _ = _request(base, case["path"], case["body"], session)
                 after = lab.store.snapshot()
                 changed, expected = before != after, case[variant]
                 expected_after = _expected_state(before, case["path"], case["body"], session, expected)
-                passed = after == expected_after and changed == expected and ((status == 200) == expected)
+                setup_passed = all(step["passed"] for step in setup_log)
+                passed = setup_passed and after == expected_after and changed == expected and ((status == 200) == expected)
                 results.append({
                     "case_id": case["id"], "category": case["category"], "variant": variant,
                     "request": {"method": "POST", "path": case["path"], "session": session, "body": case["body"]},
-                    "setup": setup_log, "http_status": status,
+                    "setup": setup_log, "setup_passed": setup_passed, "http_status": status,
                     "state_before": before, "state_after": after, "expected_state_after": expected_after,
                     "state_matches_expected": after == expected_after, "state_changed": changed,
                     "expected_state_changed": expected, "passed": passed,
@@ -184,6 +209,7 @@ def _markdown(result):
              "- 静态分析与 HTTP 实验使用同一组 vulnerable.py / fixed.py 函数。",
              "- 可信策略由实验方在源码包之外提供；缺上下文样本只分析、不执行。",
              "- 动态结论根据服务端状态变化和响应共同判断，不是仅检查 HTTP 200。",
+             "- 每个准备步骤也核对预期 HTTP、完整业务状态及各会话状态；前置条件不成立时该场景判为失败。",
              "- 验证码用确定性的服务端测试桩代替，只验证流程状态与会话绑定，不测试验证码算法。",
              "- 实验未覆盖生产持久化、并发、完整认证和所有业务规则。", "",
              f"静态对照：{sum(x['passed'] for x in result['static_checks'])}/{len(result['static_checks'])} 满足预期。",

@@ -1,9 +1,9 @@
-# POC — 隐性逻辑：本实验禁止用户修改其他用户的订单；服务端身份与持久化订单归属必须相同。
+# POC — 隐性逻辑：本实验购买数量必须为正整数；传输层验证整数类型，本规则验证正数边界。
 
-- finding_id: `BL-0db0a833e1547a`
-- type: `idor` / CWE-639
+- finding_id: `BL-5af617653bcca5`
+- type: `business_logic` / CWE-840
 - severity: `high`
-- file: `vulnerable.py:20`
+- file: `vulnerable.py:26`
 
 ## 步骤
 
