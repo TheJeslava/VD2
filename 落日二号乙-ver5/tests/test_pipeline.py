@@ -231,7 +231,12 @@ class TestSecurityGuard(unittest.TestCase):
             result = run_pipeline(zip_path, _settings(root))
             self.assertTrue(result.injection_signals)
             self.assertTrue(result.project.manifest["security"]["quarantined_files"])
-            self.assertFalse(any(item.vulnerability_type == "path_traversal" for item in result.findings))
+            # ver5 已恢复确定性规则；Prompt 注入隔离不能关闭离线源码检测。
+            traversal = [item for item in result.findings if item.vulnerability_type == "path_traversal"]
+            self.assertTrue(traversal)
+            self.assertTrue(all(item.origin == "rule" and item.file_path == "Inj.java" for item in traversal))
+            self.assertEqual(result.llm_usage, [])
+            self.assertTrue(all(item.verdict == "candidate" and not item.poc.safety["executed"] for item in traversal))
 
     def test_zip_slip_rejected(self):
         with tempfile.TemporaryDirectory(prefix="sunset-zip-") as tmp:
@@ -281,7 +286,9 @@ class TestLogicCoverage(unittest.TestCase):
                 zf.write(fixture, "LogicController.java")
             result = run_pipeline(zip_path, _settings(root))
             types = {item.vulnerability_type for item in result.findings}
-            self.assertEqual(types, set(), "业务规则候选不应在乙版本静态管线中生成")
+            self.assertTrue({"idor", "business_logic"}.issubset(types), "恢复的通用规则应检出夹具中的两类问题")
+            self.assertTrue(result.project.manifest["rule_stats"]["enabled"])
+            self.assertTrue(all(item.needs_verification and item.verdict == "candidate" for item in result.findings))
 
 
 class TestTaxonomy(unittest.TestCase):

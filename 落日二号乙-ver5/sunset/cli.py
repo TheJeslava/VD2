@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--llm-finding-budget", type=int, default=None,
                       help="LLM 深挖送入模型的源码字符预算（4000-44000，默认 30000）")
     scan.add_argument("--env-file", help="从 .env 读取 LLM/AWVS 配置")
+    scan.add_argument("--logic-policy", help="ZIP 模式的可信业务规则 JSON（由操作者显式指定）")
     scan.add_argument("--min-severity", choices=["critical", "high", "medium", "low"], help="最低严重度")
     scan.add_argument("--min-confidence", type=float, help="最低置信度")
     scan.add_argument("--max-findings", type=int, help="最多输出 finding 数")
@@ -150,6 +151,9 @@ def main(argv: list[str] | None = None) -> int:
     settings.extra["keep_work"] = bool(getattr(args, "keep_work", False))
 
     if settings.input_mode == "url":
+        if settings.logic_policy:
+            print("--logic-policy 需要 ZIP 源码模式；URL 模式无法核对源码业务条件", file=sys.stderr)
+            return 1
         target = settings.target_url or (args.target if getattr(args, "target", None) else "")
         if not target:
             print("URL 模式需要 --target URL", file=sys.stderr)

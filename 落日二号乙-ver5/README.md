@@ -1,5 +1,13 @@
 # 落日二号乙 ver5（Sunset Two Beta）
 
+## 勇旭：隐性逻辑漏洞专属模块
+
+新增 `LogicAnalyzer`，支持流程前置条件、对象授权和业务约束三类规则。通过操作者显式提供的业务规则做 Python AST 局部判定，并内置 PHP 分步验证码改密模式的适配器。结果区分 `candidate` / `guarded` / `needs_context`，写入 `logic_analysis.json` 和主报告；静态候选不会自动变成已验证漏洞。
+
+实现范围、可信规则格式、对照实验与运行说明见 [隐性逻辑模块说明](docs/HIDDEN_LOGIC.md)。源码扫描可增加 `--logic-policy trusted-policy.json`；待审项目中的规则文件不会被自动信任。
+
+> 当前 ZIP 管线实际融合确定性规则与 LLM。下面部分历史说明仍使用“移除规则”的旧表述；以 `sunset/pipeline.py` 的实际执行流程为准。
+
 ## ver5：暴风星云裂 20 类覆盖
 
 本版以 ver4 为兼容基线，新增 `sunset/baofeng.py` 统一维护暴风星云裂的 20 个金标类别和 58 个样本（001–058）。`runtime/baofeng-targets.json` 是 AWVS-compatible manifest，可直接交给 URL 模式的本地探针或作为真实 AWVS 的目标种子。

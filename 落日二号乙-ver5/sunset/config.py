@@ -45,6 +45,7 @@ class Settings:
     output_dir: Path | None = None
     work_dir: Path | None = None
     quiet: bool = False
+    logic_policy: str = ""  # 操作者显式指定的可信业务规则 JSON
     extra: dict = field(default_factory=dict)
 
     @property
@@ -58,6 +59,7 @@ class Settings:
     def public(self) -> dict:
         return {
             "input_mode": self.input_mode,
+            "logic_policy": self.logic_policy,
             "target_url": self.target_url,
             "awvs_local": self.awvs_local,
             "awvs_manifest": self.awvs_manifest,
@@ -206,6 +208,7 @@ def resolve_settings(args) -> Settings:
     if getattr(args, "work_dir", None):
         settings.work_dir = Path(args.work_dir)
     settings.quiet = bool(getattr(args, "quiet", False))
+    settings.logic_policy = getattr(args, "logic_policy", None) or ""
 
     if settings.llm_mode == "on" and not settings.llm_api_key:
         settings.llm_mode = "off"

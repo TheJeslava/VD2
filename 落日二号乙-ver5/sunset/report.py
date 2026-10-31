@@ -194,6 +194,13 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
     })
 
     # AWVS
+    _write_json(out_dir / "logic_analysis.json", {
+        "generated_at": generated_at,
+        "assessments": result.logic_assessments,
+        "policy": result.project.manifest.get("logic_analysis", {}).get("policy", {}),
+        "note": "candidate=静态候选；guarded=指定局部规则有保护；needs_context=证据不足。均不是动态验证结果。",
+    })
+
     _write_json(out_dir / "awvs" / "correlations.json", {
         "generated_at": generated_at,
         "imported": result.awvs_imported,
@@ -344,6 +351,21 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
         lines += _finding_section(finding, index, poc_mapping.get(finding.finding_id))
 
     lines += [
+        "## 隐性逻辑专属判定（LogicAnalyzer）",
+        "",
+        "详细证据、缺口与对照验证步骤见 `logic_analysis.json`。未执行目标 POC。",
+        "`guarded` 只表示指定局部规则有保护，不代表应用安全；`needs_context` 不算已检出漏洞。",
+        "",
+        "| 规则 | 位置 | 状态 | 理由 |",
+        "|---|---|---|---|",
+    ]
+    for assessment in result.logic_assessments:
+        lines.append(f"| {_md(assessment['expected_rule'])} | `{_md(assessment['file'])}:{assessment['line_end']}` | "
+                     f"{assessment['status']} | {_md(assessment['reason'])} |")
+    if not result.logic_assessments:
+        lines.append("| — | — | 未覆盖 | 未匹配内置流程模式或未提供适用的业务规则，不能据此认定安全 |")
+    lines += [
+        "",
         "## 4. 二次注入（SecondOrderAnalyzer）",
         "",
     ]
@@ -446,6 +468,7 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
             "findings": len(result.findings),
             "with_poc": sum(1 for finding in result.findings if finding.poc and finding.poc.scripts),
             "second_order": len(result.second_order),
+            "logic_assessments": len(result.logic_assessments),
             "candidates": len(result.candidates),
             "injection_signals": len(result.injection_signals),
             "awvs_imported": len(result.awvs_imported),
@@ -454,7 +477,7 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
         "structured_report": structured_paths,
         "files": ["report.md", "report.json", "report.schema.json", "report.sarif", "report.html",
                   "result.json", "findings.csv", "coverage.json",
-                  "security/injection_report.json", "second_order.json", "awvs/targets.json",
+                  "security/injection_report.json", "second_order.json", "logic_analysis.json", "awvs/targets.json",
                   "awvs/correlations.json", "poc/"],
     })
     if log:

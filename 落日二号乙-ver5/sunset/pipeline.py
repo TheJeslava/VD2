@@ -3,9 +3,10 @@
 顺序：
   ingest → index → SafetyGuard(隔离) → SurfaceMapper(攻击面)
   → DeepFinder(LLM 自主发现，无工具) → CandidateScreener(筛选) → VulnerabilityAnalyzer(深挖)
-  → SecondOrderAnalyzer(二次注入) → AWVS(联动) → PocWriter(POC) → Coordinator(汇总) → report
+  → SecondOrderAnalyzer(二次注入) → LogicAnalyzer(隐性逻辑) → AWVS(联动)
+  → PocWriter(POC) → Coordinator(汇总) → report
 
-本版本不运行确定性规则候选生成器。全程没有 sandbox、没有 POC 执行、没有工具调用；
+ZIP 模式融合确定性规则与 LLM 候选。管线不执行 POC、不向模型暴露工具；
 LLM 仅在各 agent 内做一次 JSON 调用。URL 模式的 AWVS 候选仍作为外部输入保留。
 """
 
@@ -21,6 +22,7 @@ from pathlib import Path
 from .agents import (
     CoordinatorAgent,
     DeepFinderAgent,
+    LogicAnalyzerAgent,
     SecondOrderAnalyzerAgent,
     VulnerabilityAnalyzerAgent,
     CandidateScreenerAgent,
@@ -29,6 +31,7 @@ from .agents import (
     SafetyGuardAgent,
 )
 from .agents.base import AgentContext
+from .agents.logic_analyzer import load_logic_policies
 from .awvs import AwvsClient, correlate, export_targets, parse_report
 from .config import Settings
 from .indexer import detect_frameworks, extract_endpoints
@@ -61,6 +64,8 @@ class SunsetPipeline:
 
     def run(self) -> RunResult:
         started = time.time()
+        # 配置错误应直接反馈，不能静默跳过操作者要求的业务规则。
+        logic_policies, logic_provenance = load_logic_policies(self.settings.logic_policy)
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         out_dir = (self.settings.output_dir or (Path.cwd() / "sunset-results" / run_id)).resolve()
         work_dir = (self.settings.work_dir or (out_dir / ".work" / run_id)).resolve()
@@ -84,6 +89,8 @@ class SunsetPipeline:
             llm=LlmClient(self.settings) if self.settings.llm_enabled else None,
             injection_signals=guard.signals,
             quarantined=set(guard.quarantined),
+            logic_policies=logic_policies,
+            logic_policy_provenance=logic_provenance,
         )
         if guard.signals:
             self.log(f"安全防护：{len(guard.signals)} 条注入迹象，隔离 {len(guard.quarantined)} 个文件")
@@ -139,6 +146,8 @@ class SunsetPipeline:
         second_order_analyzer = SecondOrderAnalyzerAgent()
         self._run_agent(ctx, second_order_analyzer)
 
+        self._run_agent(ctx, LogicAnalyzerAgent())
+
         awvs_imported: list[dict] = []
         awvs_correlations: list[dict] = []
         try:
@@ -182,6 +191,7 @@ class SunsetPipeline:
             llm_usage=list(ctx.llm.usage) if ctx.llm else [],
             stage_log=ctx.stage_log,
             summary=ctx.summary,
+            logic_assessments=ctx.logic_assessments,
         )
         result.project.manifest["rule_stats"] = rule_stats
         result.project.manifest["security"] = guard.summary()

@@ -30,6 +30,9 @@ class AgentContext:
     quarantined: set[str] = field(default_factory=set)
     stage_log: list[dict[str, Any]] = field(default_factory=list)
     awvs_vulns: list[Any] = field(default_factory=list)
+    logic_assessments: list[dict[str, Any]] = field(default_factory=list)
+    logic_policies: list[dict[str, Any]] = field(default_factory=list)
+    logic_policy_provenance: dict[str, Any] = field(default_factory=dict)
 
     @property
     def allowed_files(self) -> set[str]:

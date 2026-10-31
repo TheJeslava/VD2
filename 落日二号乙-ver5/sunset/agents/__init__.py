@@ -8,6 +8,7 @@ from .base import AgentContext, AgentResult, BaseAgent  # noqa: F401
 from .candidate_screener import CandidateScreenerAgent  # noqa: F401
 from .coordinator import CoordinatorAgent  # noqa: F401
 from .deep_finder import DeepFinderAgent  # noqa: F401
+from .logic_analyzer import LogicAnalyzerAgent  # noqa: F401
 from .poc_writer import PocWriterAgent  # noqa: F401
 from .safety_guard import SafetyGuardAgent  # noqa: F401
 from .second_order_analyzer import SecondOrderAnalyzerAgent  # noqa: F401
@@ -18,4 +19,5 @@ __all__ = [
     "AgentContext", "AgentResult", "BaseAgent",
     "CoordinatorAgent", "SecondOrderAnalyzerAgent", "VulnerabilityAnalyzerAgent", "CandidateScreenerAgent", "PocWriterAgent",
     "SurfaceMapperAgent", "SafetyGuardAgent", "DeepFinderAgent",
+    "LogicAnalyzerAgent",
 ]

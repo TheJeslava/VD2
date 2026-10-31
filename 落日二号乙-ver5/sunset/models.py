@@ -231,6 +231,7 @@ class RunResult:
     llm_usage: list[dict[str, Any]] = field(default_factory=list)
     stage_log: list[dict[str, Any]] = field(default_factory=list)
     summary: str = ""
+    logic_assessments: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return _plain(self.__dict__)
