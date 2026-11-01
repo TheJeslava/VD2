@@ -72,7 +72,7 @@ class CoordinatorAgent(BaseAgent):
             fallback = (
                 f"URL 模式：AWVS 来源 {ctx.project.manifest.get('awvs_provider', 'unknown')}，"
                 f"产出 {len(deduped)} 条动态候选，覆盖 {len(types)} 种漏洞类型；"
-                f"{with_poc} 条已生成可重放的 POC。结论仍为 candidate，需落日验证动态确认。"
+                f"{with_poc} 条已生成可重放的 POC。结论仍为 candidate，需VulnCatcher-Verify动态确认。"
             )
             if not deduped:
                 fallback = "URL 模式：AWVS 未返回可复现的动态候选；目标可达但未观察到证据。"

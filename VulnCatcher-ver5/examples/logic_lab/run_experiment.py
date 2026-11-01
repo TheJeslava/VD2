@@ -264,7 +264,7 @@ def run_experiment(output):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=Path("sunset-results/logic-lab"))
+    parser.add_argument("--out", type=Path, default=Path("vulncatcher-results/logic-lab"))
     args = parser.parse_args(argv)
     result = run_experiment(args.out)
     print(json.dumps(result["summary"], ensure_ascii=False))

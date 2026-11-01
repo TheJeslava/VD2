@@ -3,7 +3,7 @@
 ## 1. 目录
 
 ```
-VulnCatcher/runtime/
+VulnCatcher-ver4/runtime/
 ├─ benchmark-lite/            # 从 BenchmarkJavaRetry 复制并裁剪为 66 个样本
 │  ├─ src/main/java/.../testcode/          # 66 个 servlet
 │  ├─ src/main/webapp/<category>-00/       # 66 个 HTML
@@ -35,7 +35,7 @@ VulnCatcher/runtime/
 - 清空 `tomcat.jvmargs.debug`：避免 `-Djava.compiler=NONE` + JDWP 让 Tomcat 部署极慢。
 
 ```powershell
-cd VulnCatcher\runtime\benchmark-lite
+cd VulnCatcher-ver4\runtime\benchmark-lite
 docker run --rm -v "${PWD}:/workspace" -v sunset-m2:/root/.m2 -w /workspace `
   docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-17 `
   mvn -B -DskipTests package
@@ -86,6 +86,6 @@ curl.exe -sS -i -X POST http://localhost:8080/benchmark/pathtraver-00/BenchmarkT
 
 ## 6. 说明
 
-- 靶场用 HTTP 8080。Benchmark 的部分 cookie 设置了 `Secure`，浏览器在 HTTP 下不会回传；本地 AWVS-compatible 探针/落日验证显式构造 Cookie，所以实验不受影响。
+- 靶场用 HTTP 8080。Benchmark 的部分 cookie 设置了 `Secure`，浏览器在 HTTP 下不会回传；本地 AWVS-compatible 探针/VulnCatcher-Verify显式构造 Cookie，所以实验不受影响。
 - 若要接真实 AWVS，建议改成 HTTPS 8443（工程自带 `.keystore` 和 `src/config/remote/server.xml`），并让扫描器忽略自签名证书。
 - 容器名 `sunset-benchmark`；删除它会丢失容器内的 DB/LDAP 进程，需按上面步骤重建。

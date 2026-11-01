@@ -12,13 +12,13 @@
 
 ## ver5：集成数据集 20 类覆盖
 
-本版以 ver4 为兼容基线，新增 `sunset/baofeng.py` 统一维护集成数据集的 20 个金标类别和 58 个样本（001–058）。`runtime/baofeng-targets.json` 是 AWVS-compatible manifest，可直接交给 URL 模式的本地探针或作为真实 AWVS 的目标种子。
+本版以 ver4 为兼容基线，新增 `sunset/baofeng.py` 统一维护集成数据集的 20 个金标类别和 58 个样本（001–058）。`runtime/dataset-targets.json` 是 AWVS-compatible manifest，可直接交给 URL 模式的本地探针或作为真实 AWVS 的目标种子。
 
 覆盖目标包括 API 信息泄露、认证绕过、越权/IDOR、暴力破解、验证码绕过、弱加密、CSP、CSRF、命令注入、路径穿越/LFI、客户端校验绕过、开放重定向、盲 SQL 注入、SQL 注入、文件上传、弱 ID、DOM/反射/存储型 XSS，以及 058 的二次注入。样本编号和类别只选择测试目标与探针通道；只有实时 HTTP 证据或显式导入的 AWVS 报告才能生成 finding。二次注入需要跨请求 `store → read → sink`，单次响应不会被标记成动态确认。
 
 ```powershell
-python tools/generate_baofeng_manifest.py
-powershell -File ..\run_baofeng_ver5.ps1
+python tools/dataset_generate_manifest.py
+python tools/dataset_run_url.py --out .\results\dataset-url
 ```
 
 URL 运行结果会额外写入 `awvs/coverage.json`，记录真实动态证据和未命中目标；清单中的编号、类别、CWE、参数和方法只是测试目标元数据，不会在没有 HTTP 证据时伪造 finding。
@@ -35,7 +35,7 @@ VulnCatcher 延续早期版本的 zip/URL 结构，但 zip 模式移除确定性
 - `--mode zip`：SafetyGuard → SurfaceMapper → DeepFinder → CandidateScreener 的源码审计，不调用 AWVS；
 - `--mode url`：由 AWVS（真实 API / 导出报告 / 本地 AWVS-compatible 探针）提出动态候选，再走 SurfaceMapper → CandidateScreener → VulnerabilityAnalyzer → PocWriter → Coordinator，产出 POC 与报告。
 
-两条管线共享同一套 finding/POC/report 契约，终点都是 **POC + 含 POC 的报告**。VulnCatcher自身仍不执行 POC；动态验证由 `../落日验证` 完成。
+两条管线共享同一套 finding/POC/report 契约，终点都是 **POC + 含 POC 的报告**。VulnCatcher自身仍不执行 POC；动态验证由 `../VulnCatcher-Verify` 完成。
 
 > 所有 finding 默认 `verdict=candidate`。POC 只写不跑，目标统一使用 `TARGET` 占位符（URL 模式会在 `poc.safety.target_url` 保留实际目标供验证器解析）。
 
@@ -106,7 +106,7 @@ python -m unittest discover -s tests -v
 | `--keep-work` | 保留解压目录，便于复核 |
 | `--require-findings` | 无 finding 时返回退出码 2 |
 
-> **benchmark 覆盖率提示**：默认 `high` 会过滤 weak_crypto / weak_hash / weak_random / insecure_cookie / trust_boundary 等 medium 类；跑 OWASP Benchmark 或做覆盖率评估时请显式使用 `--min-severity medium`。被档位过滤的候选**不会消失**：它们会写入 `report.json` 的 `policy.suppressed` 并在 `report.md` 的「策略抑制」表里逐条列出，因此"没输出"与"没检出"可以区分。修改前后对比与逐例归因见 [`../reports-VulnCatcher/VulnCatcher-zip管线18-0-15-33漏报归因与优化报告.md`](../reports-VulnCatcher/VulnCatcher-zip管线18-0-15-33漏报归因与优化报告.md)。
+> **benchmark 覆盖率提示**：默认 `high` 会过滤 weak_crypto / weak_hash / weak_random / insecure_cookie / trust_boundary 等 medium 类；跑 OWASP Benchmark 或做覆盖率评估时请显式使用 `--min-severity medium`。被档位过滤的候选**不会消失**：它们会写入 `report.json` 的 `policy.suppressed` 并在 `report.md` 的「策略抑制」表里逐条列出，因此"没输出"与"没检出"可以区分。修改前后对比与逐例归因见 [`../reports-VulnCatcher-ver5/VulnCatcher-zip管线18-0-15-33漏报归因与优化报告.md`](../reports-VulnCatcher-ver5/VulnCatcher-zip管线18-0-15-33漏报归因与优化报告.md)。
 
 ---
 
@@ -644,7 +644,7 @@ OK
 ## 13. 目录结构
 
 ```
-VulnCatcher/
+VulnCatcher-ver5/
 ├─ README.md
 ├─ run.py                      # 便捷入口：python run.py <zip>
 ├─ requirements.txt            # 仅标准库

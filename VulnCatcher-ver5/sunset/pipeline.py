@@ -67,7 +67,7 @@ class SunsetPipeline:
         # 配置错误应直接反馈，不能静默跳过操作者要求的业务规则。
         logic_policies, logic_provenance = load_logic_policies(self.settings.logic_policy)
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-        out_dir = (self.settings.output_dir or (Path.cwd() / "sunset-results" / run_id)).resolve()
+        out_dir = (self.settings.output_dir or (Path.cwd() / "vulncatcher-results" / run_id)).resolve()
         work_dir = (self.settings.work_dir or (out_dir / ".work" / run_id)).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         work_dir.mkdir(parents=True, exist_ok=True)

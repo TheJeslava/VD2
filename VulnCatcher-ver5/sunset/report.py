@@ -206,7 +206,7 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
         "imported": result.awvs_imported,
         "correlations": result.awvs_correlations,
         "note": (
-            "URL 模式：AWVS 是候选提出组件；本管线消费其结果并生成 POC，动态确认由落日验证完成。"
+            "URL 模式：AWVS 是候选提出组件；本管线消费其结果并生成 POC，动态确认由VulnCatcher-Verify完成。"
             if input_mode == "url" else
             "AWVS 外部结果只作为佐证；本管线未执行扫描。"
         ),
@@ -276,7 +276,7 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
         f"**{len(result.injection_signals)}** 条 Prompt 注入迹象，隔离 **{len(result.project.manifest.get('security', {}).get('quarantined_files', []))}** 个文件。",
         "",
         "> 本管线不执行 POC、不搭建沙箱、不做动态验证。所有 verdict 为 `candidate` 或 `external`，"
-        "需要在授权环境人工复核；URL 模式的 POC 由落日验证动态执行。",
+        "需要在授权环境人工复核；URL 模式的 POC 由VulnCatcher-Verify动态执行。",
         "",
     ]
     if suppressed_count:
@@ -409,7 +409,7 @@ def write_reports(result: RunResult, out_dir: Path, *, settings: Settings,
         "- 目标种子：`awvs/targets.json`",
         (
             "- 说明：URL 模式下 AWVS 是候选提出组件；本管线消费其 URL/请求/证据并生成 POC，"
-            "不执行扫描；动态确认由落日验证完成。"
+            "不执行扫描；动态确认由VulnCatcher-Verify完成。"
             if input_mode == "url" else
             "- 说明：AWVS 是外部动态扫描器；本管线只导入其结果做佐证，或导出端点供 AWVS 播种。"
         ),

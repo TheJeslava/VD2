@@ -6,7 +6,7 @@ report, or the local AWVS-compatible probe) and asks "what did the scanner
 observe, and can we turn each candidate into a replayable POC?".
 
 It intentionally keeps the same agent names and output contract as the zip
-pipeline so reports, POCs, and 落日验证 can consume both modes.
+pipeline so reports, POCs, and VulnCatcher-Verify can consume both modes.
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ class SunsetUrlPipeline:
     def run(self) -> RunResult:
         started = time.time()
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-        out_dir = (self.settings.output_dir or (Path.cwd() / "sunset-results" / run_id)).resolve()
+        out_dir = (self.settings.output_dir or (Path.cwd() / "vulncatcher-results" / run_id)).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         self.settings.output_dir = out_dir
         target = self.options.target_url

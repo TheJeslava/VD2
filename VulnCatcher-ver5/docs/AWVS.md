@@ -2,7 +2,7 @@
 
 ## ver5 集成数据集覆盖
 
-`runtime/baofeng-targets.json` 使用 `awvs-compatible-manifest-v2`，包含 58 个编号样本和 20 个金标类别。`sunset/baofeng.py` 是唯一的类别注册表，URL 本地探针、ZIP 的 `awvs/targets.json` 和覆盖统计都从这里生成，避免不同入口出现类别漂移。
+`runtime/dataset-targets.json` 使用 `awvs-compatible-manifest-v2`，包含 58 个编号样本和 20 个金标类别。`sunset/baofeng.py` 是唯一的类别注册表，URL 本地探针、ZIP 的 `awvs/targets.json` 和覆盖统计都从这里生成，避免不同入口出现类别漂移。
 
 本地探针对可由 HTTP 响应确认的注入、XSS、重定向、CSP、上传、认证和访问控制信号执行基线/攻击比较。清单中的类别和参数只用于选择探针，不会在没有响应证据时生成 finding；弱加密、二次注入等不能由单次 HTTP 请求确认的类别应使用 ZIP 分析、跨请求动态流程或真实 AWVS/人工复核。
 

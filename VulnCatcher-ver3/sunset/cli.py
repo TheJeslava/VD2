@@ -16,7 +16,7 @@ from .url_pipeline import run_url_pipeline
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="sunset",
+        prog="vulncatcher",
         description="VulnCatcher：zip + LLM 自主发现，或 AWVS URL 动态候选，两条可选管线",
     )
     parser.add_argument("--version", action="version", version=f"VulnCatcher {__version__}")
@@ -26,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("zip", nargs="?", help="输入 zip 路径（--mode zip）")
     scan.add_argument("--mode", choices=["zip", "url"], default="zip", help="管线模式：zip 或 url")
     scan.add_argument("--target", help="URL 模式的目标 URL（可带 /benchmark 前缀）")
-    scan.add_argument("-o", "--out", help="输出目录（默认 sunset-results/<run-id>）")
+    scan.add_argument("-o", "--out", help="输出目录（默认 vulncatcher-results/<run-id>）")
     scan.add_argument("--work-dir", help="解压工作目录")
     scan.add_argument("--keep-work", action="store_true", help="保留解压目录")
     scan.add_argument("--llm", choices=["auto", "on", "off"], default="auto", help="LLM 模式")
@@ -182,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
               f"conf={item.confidence} poc={'yes' if item.poc and item.poc.scripts else 'no'}")
     if len(findings) > 10:
         print(f"  ... 另有 {len(findings) - 10} 条")
-    out_dir = settings.output_dir or (Path.cwd() / "sunset-results")
+    out_dir = settings.output_dir or (Path.cwd() / "vulncatcher-results")
     print(f"输出：{settings.output_dir if settings.output_dir else out_dir}")
     if args.require_findings and not findings:
         return 2

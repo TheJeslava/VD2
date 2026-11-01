@@ -10,7 +10,7 @@ zip 模式：zip → 源码规则/LLM → POC/报告
 URL 模式：URL + AWVS → 动态候选 → POC/报告
 ```
 
-AWVS 不是 Semgrep 式源码补丁，也不替代静态规则；它只提出「哪个 URL 上观察到了什么」，后续 agent 负责保留证据、生成可重放 POC、交给落日验证动态确认。
+AWVS 不是 Semgrep 式源码补丁，也不替代静态规则；它只提出「哪个 URL 上观察到了什么」，后续 agent 负责保留证据、生成可重放 POC、交给VulnCatcher-Verify动态确认。
 
 ## 2. 三种 AWVS 来源
 
@@ -76,9 +76,9 @@ results/<run-id>/
 | PocWriter | 按 source_kind 生成请求 | 优先保留 AWVS 原始请求，生成可重放 POC |
 | Coordinator | 文件+行号去重 | endpoint+类型去重 |
 
-## 6. 与落日验证的衔接
+## 6. 与VulnCatcher-Verify的衔接
 
-VulnCatcher只写 POC，不执行。`../落日验证` 读取 `report.json`：
+VulnCatcher只写 POC，不执行。`../VulnCatcher-Verify` 读取 `report.json`：
 
 - `--mode url`：使用 `poc.safety.target_url`（或 run.target_url）解析目标；
 - `--mode zip`：用 `--target-base` + endpoint 解析 `TARGET`；
@@ -93,13 +93,13 @@ VulnCatcher只写 POC，不执行。`../落日验证` 读取 `report.json`：
 |---|---|---|
 | 实验数 | 66 | 66 |
 | 产出 POC 的样本 | 20 | 25（29 条 POC） |
-| 落日验证 verified | 20 | 11 |
+| VulnCatcher-Verify verified | 20 | 11 |
 | rejected | 0 | 15 |
 | inconclusive | 0 | 3 |
 | error | 0 | 0 |
 
 URL 模式检出的 20 条全部是 lite 的真漏洞（precision 100%）；13 条真漏洞未产出 POC，其中 12 条属于 crypto/hash/weakrand/trustbound 这类黑盒不可观测类别，1 条是 xpathi（00607）未命中。  
-ZIP 模式的 15 条 rejected 主要是静态规则的误报（例如把 xpathi 输出误判为 XSS）或盲注/无回显场景；落日验证能把这些 POC 拒掉，说明验证环节有实际区分力。
+ZIP 模式的 15 条 rejected 主要是静态规则的误报（例如把 xpathi 输出误判为 XSS）或盲注/无回显场景；VulnCatcher-Verify能把这些 POC 拒掉，说明验证环节有实际区分力。
 
 复现脚本：
 
@@ -107,10 +107,10 @@ ZIP 模式的 15 条 rejected 主要是静态规则的误报（例如把 xpathi 
 py .\runtime\run_experiments.py --mode url --workers 4
 py .\runtime\run_experiments.py --mode zip --workers 4
 
-cd ..\落日验证
-py -m sunset_verify verify --mode url --results-dir ..\VulnCatcher\results\url `
-  --out ..\VulnCatcher\results\url-verification --workers 4
-py -m sunset_verify verify --mode zip --results-dir ..\VulnCatcher\results\zip `
+cd ..\VulnCatcher-Verify
+py -m sunset_verify verify --mode url --results-dir ..\VulnCatcher-ver3\results\url `
+  --out ..\VulnCatcher-ver3\results\url-verification --workers 4
+py -m sunset_verify verify --mode zip --results-dir ..\VulnCatcher-ver3\results\zip `
   --target-base http://localhost:8080/benchmark `
-  --out ..\VulnCatcher\results\zip-verification --workers 4
+  --out ..\VulnCatcher-ver3\results\zip-verification --workers 4
 ```

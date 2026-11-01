@@ -238,7 +238,7 @@ def build_url_poc(vuln: AwvsVulnerability, target_url: str) -> PocPlan:
         preconditions=[
             "Target is running and the endpoint is reachable.",
             f"Input channel: {channel} `{parameter}`.",
-            "The POC is passive text; 落日验证 owns execution against an allowlisted local target.",
+            "The POC is passive text; VulnCatcher-Verify owns execution against an allowlisted local target.",
         ],
         steps=[
             {"step": 1, "action": "Baseline request", "request": baseline_curl,
@@ -341,7 +341,7 @@ def finding_from_url_candidate(candidate: Candidate, vuln: AwvsVulnerability, ta
         ),
         verification_notes=(
             "AWVS candidate from URL mode. Not verified by this pipeline; "
-            "落日验证 should replay the preserved request against the allowlisted target."
+            "VulnCatcher-Verify should replay the preserved request against the allowlisted target."
         ),
         endpoint=candidate.endpoint,
         http_method=candidate.http_method,

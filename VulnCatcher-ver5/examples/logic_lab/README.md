@@ -24,7 +24,7 @@ HTTP 服务使用测试会话 alice-demo / bob-demo 代表两个用户，验证�
 
 使用主流程检测同一份源码包：
 
-    python -m sunset scan docs/experiments/logic_20261101/logic_lab_sources.zip --llm off --logic-policy examples/logic_lab/policies.json --out sunset-results/logic-lab-pipeline
+    python -m sunset scan docs/experiments/logic_20261101/logic_lab_sources.zip --llm off --logic-policy examples/logic_lab/policies.json --out vulncatcher-results/logic-lab-pipeline
 
 注意主程序原有配置机制会读取环境设置；如果只想完全离线、不加载 .env，使用实验 runner，或直接构造 Settings(llm_mode="off") 调用 run_pipeline。实验 runner 不使用主程序的配置加载器。
 

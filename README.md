@@ -7,18 +7,21 @@
 ```text
 .
 ├── 集成数据集/           # 原始 001–058 样本、压缩包和编号说明
-├── VulnCatcher/           # ver1
+├── VulnCatcher-ver1/       # ver1
 ├── VulnCatcher-ver2/       # ver2
 ├── VulnCatcher-ver3/       # ver3
 ├── VulnCatcher-ver4/       # ver4
-└── VulnCatcher-ver5/       # ver5，包含最新 URL/AWVS 管线
+├── VulnCatcher-ver5/       # ver5，包含最新 URL/AWVS 管线
+└── VulnCatcher-Verify/     # POC 动态验证模块
 ```
 
 每个版本目录包含源码、提示词、运行时 fixture、测试、文档和历史实验结果。版本之间保留了演进过程，便于复现实验和比较行为。
 
-现行目录、界面、提示词和文档统一使用上述名称。Python 包和命令入口继续使用 `sunset`，已有 `baofeng_*` 工具标识也继续兼容；最新版本从 `VulnCatcher-ver5/` 运行。历史 `results/` 和 `docs/experiments/logic_20261101/` 保留实验当时的名称、绝对路径及校验值，复现时请使用现行目录。
+现行目录、界面、提示词和文档统一使用上述名称。最新版本从 `VulnCatcher-ver5/` 运行，默认输出写入 `vulncatcher-results/`。安装后可用 `vulncatcher` 命令，`python -m sunset` 和旧命令继续兼容；数据集工具以 `dataset_` 开头，旧脚本名保留兼容入口。完整映射见 [命名与兼容说明](NAMING.md)。历史 `results/` 和 `docs/experiments/` 保留实验当时的名称、绝对路径及校验值。
 
 命名调整后的回归、本地实验和文件完整性检查见 [验证记录](VulnCatcher-ver5/docs/experiments/rename_20261101/validation.md)。
+
+后续验证模块、工具入口与默认输出迁移的结果见 [命名与兼容验证](VulnCatcher-ver5/docs/experiments/naming_compat_20261101/validation.md)。
 
 ## 集成数据集
 
@@ -43,28 +46,21 @@ python -m unittest discover -s tests -v
 ver5 支持三种 AWVS 候选来源：真实 AWVS API、AWVS 导出报告，以及本地 AWVS-compatible 探针。完整的 58 个目标清单位于：
 
 ```text
-VulnCatcher-ver5/runtime/baofeng-targets.json
+VulnCatcher-ver5/runtime/dataset-targets.json
 ```
 
-本地隔离靶场的复现实验可使用仓库外的运行环境，并通过以下脚本启动 URL 管线：
-
-```powershell
-cd C:\path\to\VD2
-powershell -File .\run_baofeng_ver5.ps1
-```
-
-也可以直接调用工具：
+本地隔离靶场启动后，可直接调用仓库内的工具运行 URL 管线：
 
 ```powershell
 cd VulnCatcher-ver5
-python tools/generate_baofeng_manifest.py --base-url http://127.0.0.1:18081
-python tools/run_baofeng_url.py `
+python tools/dataset_generate_manifest.py --base-url http://127.0.0.1:18081
+python tools/dataset_run_url.py `
   --project . `
   --base-url http://127.0.0.1:18081 `
-  --out .\results\baofeng-url
+  --out .\results\dataset-url
 ```
 
-URL 管线只把实时 HTTP 响应、AWVS 报告或本地探针返回的动态证据写入 finding。manifest 中的样本编号、类别、CWE、参数和请求方法是测试目标元数据，不会单独生成漏洞结论。`tools/baofeng_dvwa_adapter.py` 只负责本地样本路径到隔离 DVWA 路由的传输映射，不承担检测结论。
+URL 管线只把实时 HTTP 响应、AWVS 报告或本地探针返回的动态证据写入 finding。manifest 中的样本编号、类别、CWE、参数和请求方法是测试目标元数据，不会单独生成漏洞结论。`tools/dataset_dvwa_adapter.py` 只负责本地样本路径到隔离 DVWA 路由的传输映射，不承担检测结论。
 
 ## ZIP 管线
 

@@ -62,7 +62,7 @@ class SunsetPipeline:
     def run(self) -> RunResult:
         started = time.time()
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-        out_dir = (self.settings.output_dir or (Path.cwd() / "sunset-results" / run_id)).resolve()
+        out_dir = (self.settings.output_dir or (Path.cwd() / "vulncatcher-results" / run_id)).resolve()
         work_dir = (self.settings.work_dir or (out_dir / ".work" / run_id)).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         work_dir.mkdir(parents=True, exist_ok=True)
