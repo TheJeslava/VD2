@@ -1,4 +1,4 @@
-"""PocCollectorAgent: read a 落日二号 result and turn POCs into replay cases."""
+"""PocCollectorAgent: read a VulnCatcher result and turn POCs into replay cases."""
 
 from __future__ import annotations
 

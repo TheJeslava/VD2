@@ -14,14 +14,14 @@ from .pipeline import summarize, verify_batch, verify_result
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sunset-verify",
-        description="落日验证：对落日二号 URL/zip 两种模式的 POC 做动态验证",
+        description="落日验证：对VulnCatcher URL/zip 两种模式的 POC 做动态验证",
     )
     parser.add_argument("--version", action="version", version=f"落日验证 {__version__}")
     sub = parser.add_subparsers(dest="command")
 
     verify = sub.add_parser("verify", help="验证单个结果目录或批量结果")
-    verify.add_argument("--mode", choices=["url", "zip"], required=True, help="与落日二号输入模式对应")
-    verify.add_argument("--result", help="单个落日二号结果目录（含 report.json）")
+    verify.add_argument("--mode", choices=["url", "zip"], required=True, help="与VulnCatcher输入模式对应")
+    verify.add_argument("--result", help="单个VulnCatcher结果目录（含 report.json）")
     verify.add_argument("--results-dir", help="批量结果根目录（递归查找 report.json）")
     verify.add_argument("--target-base", default="", help="zip 模式的部署基址，如 https://localhost:8443")
     verify.add_argument("--out", help="批量汇总输出目录")

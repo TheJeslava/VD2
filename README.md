@@ -1,31 +1,35 @@
-# VD2：落日二号乙与暴风星云裂
+# VD2：VulnCatcher 与集成数据集
 
-本仓库保存落日二号乙（Sunset Two Beta）的五个版本、暴风星云裂数据集，以及用于本地复现和回归测试的运行时文件。
+本仓库保存 VulnCatcher 的五个版本、集成数据集，以及用于本地复现和回归测试的运行时文件。
 
 ## 内容
 
 ```text
 .
-├── 暴风星云裂/          # 原始 001–058 样本、压缩包和编号说明
-├── 落日二号-乙/          # ver1
-├── 落日二号乙-ver2/      # ver2
-├── 落日二号乙-ver3/      # ver3
-├── 落日二号乙-ver4/      # ver4
-└── 落日二号乙-ver5/      # ver5，包含最新 URL/AWVS 管线
+├── 集成数据集/           # 原始 001–058 样本、压缩包和编号说明
+├── VulnCatcher/           # ver1
+├── VulnCatcher-ver2/       # ver2
+├── VulnCatcher-ver3/       # ver3
+├── VulnCatcher-ver4/       # ver4
+└── VulnCatcher-ver5/       # ver5，包含最新 URL/AWVS 管线
 ```
 
 每个版本目录包含源码、提示词、运行时 fixture、测试、文档和历史实验结果。版本之间保留了演进过程，便于复现实验和比较行为。
 
-## 暴风星云裂数据集
+现行目录、界面、提示词和文档统一使用上述名称。Python 包和命令入口继续使用 `sunset`，已有 `baofeng_*` 工具标识也继续兼容；最新版本从 `VulnCatcher-ver5/` 运行。历史 `results/` 和 `docs/experiments/logic_20261101/` 保留实验当时的名称、绝对路径及校验值，复现时请使用现行目录。
 
-`暴风星云裂/` 包含 58 个样本（001–058），覆盖 20 类 Web 漏洞及对应的 PHP/ZIP 样本。`编号对应表.md` 和清洗规则文件说明样本编号、类别和预处理约定。
+命名调整后的回归、本地实验和文件完整性检查见 [验证记录](VulnCatcher-ver5/docs/experiments/rename_20261101/validation.md)。
+
+## 集成数据集
+
+`集成数据集/` 包含 58 个样本（001–058），覆盖 20 类 Web 漏洞及对应的 PHP/ZIP 样本。`编号对应表.md` 和清洗规则文件说明样本编号、类别和预处理约定。
 
 ## 快速开始
 
 要求 Python 3.10 或更高版本。项目主体仅使用 Python 标准库；如果某个版本目录提供了 `requirements.txt`，可按该版本说明安装依赖。
 
 ```powershell
-cd 落日二号乙-ver5
+cd VulnCatcher-ver5
 
 # 运行自检
 python -m sunset selftest
@@ -39,7 +43,7 @@ python -m unittest discover -s tests -v
 ver5 支持三种 AWVS 候选来源：真实 AWVS API、AWVS 导出报告，以及本地 AWVS-compatible 探针。完整的 58 个目标清单位于：
 
 ```text
-落日二号乙-ver5/runtime/baofeng-targets.json
+VulnCatcher-ver5/runtime/baofeng-targets.json
 ```
 
 本地隔离靶场的复现实验可使用仓库外的运行环境，并通过以下脚本启动 URL 管线：
@@ -52,7 +56,7 @@ powershell -File .\run_baofeng_ver5.ps1
 也可以直接调用工具：
 
 ```powershell
-cd 落日二号乙-ver5
+cd VulnCatcher-ver5
 python tools/generate_baofeng_manifest.py --base-url http://127.0.0.1:18081
 python tools/run_baofeng_url.py `
   --project . `
@@ -67,7 +71,7 @@ URL 管线只把实时 HTTP 响应、AWVS 报告或本地探针返回的动态�
 ZIP 模式对样本源码进行安全展开、攻击面索引和漏洞候选分析，并生成报告与被动 POC 文本：
 
 ```powershell
-cd 落日二号乙-ver5
+cd VulnCatcher-ver5
 python -m sunset scan C:\path\to\sample.zip --mode zip --llm off -o .\results\sample
 ```
 

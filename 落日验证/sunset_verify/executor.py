@@ -1,7 +1,7 @@
 """Sandboxed HTTP executor for 落日验证.
 
 Only HTTP(S), only allowlisted hosts, no shell, no file writes.  The verifier
-executes the *request objects* parsed from 落日二号 POCs, never the POC script
+executes the *request objects* parsed from VulnCatcher POCs, never the POC script
 itself.
 """
 

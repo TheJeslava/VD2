@@ -1,12 +1,12 @@
 # 落日验证（Sunset Verify）
 
-> 对落日二号产出的 POC 做自动化动态验证。支持 **URL 模式** 与 **zip 模式** 两条管线，对应落日二号的两种输入模式。
+> 对VulnCatcher产出的 POC 做自动化动态验证。支持 **URL 模式** 与 **zip 模式** 两条管线，对应VulnCatcher的两种输入模式。
 
 ## 1. 定位
 
-落日二号只生成 POC，不执行 POC。落日验证负责：
+VulnCatcher只生成 POC，不执行 POC。落日验证负责：
 
-1. 从落日二号结果目录读取 `report.json` 与 POC；
+1. 从VulnCatcher结果目录读取 `report.json` 与 POC；
 2. 把 POC 解析成结构化 HTTP 请求（不执行 shell）；
 3. 在沙箱边界内请求 **localhost / allowlist 主机**；
 4. 对比 baseline 与 attack 响应，按漏洞类型判定：
@@ -36,8 +36,8 @@
 
 | 模式 | 目标解析 | 适用 |
 |---|---|---|
-| `url` | 优先使用 POC 的 `poc.safety.target_url` / `run.target_url`（AWVS 扫描目标） | 落日二号 `--mode url` |
-| `zip` | 使用 `--target-base` + finding 的 endpoint 解析 `TARGET` 占位符 | 落日二号 `--mode zip` |
+| `url` | 优先使用 POC 的 `poc.safety.target_url` / `run.target_url`（AWVS 扫描目标） | VulnCatcher `--mode url` |
+| `zip` | 使用 `--target-base` + finding 的 endpoint 解析 `TARGET` 占位符 | VulnCatcher `--mode zip` |
 
 zip 模式的 POC 文本里是 `http://TARGET:8080/...`；验证器把它映射到已部署的 lite 靶场（如 `https://localhost:8443`），不会访问任意外部主机。
 
@@ -48,16 +48,16 @@ cd C:\Users\liyuf\Desktop\794\落日验证
 
 # 单个 URL 模式结果
 py -m sunset_verify verify --mode url `
-  --result ..\落日二号\results\url\BenchmarkTest00002
+  --result ..\VulnCatcher\results\url\BenchmarkTest00002
 
 # 单个 zip 模式结果（需要已部署的 lite 靶场）
 py -m sunset_verify verify --mode zip `
-  --result ..\落日二号\results\zip\BenchmarkTest00002 `
+  --result ..\VulnCatcher\results\zip\BenchmarkTest00002 `
   --target-base https://localhost:8443
 
 # 批量验证 + 汇总
 py -m sunset_verify verify --mode url `
-  --results-dir ..\落日二号\results\url `
+  --results-dir ..\VulnCatcher\results\url `
   --out .\results\url-verification --workers 4
 ```
 
@@ -65,7 +65,7 @@ py -m sunset_verify verify --mode url `
 
 | 参数 | 说明 |
 |---|---|
-| `--mode url|zip` | 必选，对应落日二号输入模式 |
+| `--mode url|zip` | 必选，对应VulnCatcher输入模式 |
 | `--result` | 单个结果目录 |
 | `--results-dir` | 批量结果根目录（递归找 `report.json`） |
 | `--target-base` | zip 模式靶场基址；url 模式可作兜底 |
