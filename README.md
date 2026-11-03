@@ -2,6 +2,16 @@
 
 本仓库保存 VulnCatcher 的五个版本、集成数据集，以及用于本地复现和回归测试的运行时文件。
 
+## 启动网页工作台
+
+在仓库根目录使用 Python 3.10+ 运行：
+
+```sh
+python3 frontend/server.py
+```
+
+打开 <http://127.0.0.1:8765/>，可提交 ZIP、URL 或联合任务，查看实时进度、漏洞与 POC，并调用 VulnCatcher-Verify 做动态验证。Windows 用户可用 `py -3 frontend/server.py`。[工作台操作与配置](frontend/README.md)
+
 ## 内容
 
 ```text

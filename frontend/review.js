@@ -43,25 +43,27 @@ function drawMonitor() {
   const events = current ? (verifying ? current.verificationEvents : current.events) : [];
   const state = current ? (verifying ? current.verification : current.status) : 'idle';
   const logged = new Map(events.map(e => [e.key, e]));
-  const resolved = events.filter(e => e.state === 'done' || e.state === 'skipped').length;
-  const active = events.find(e => e.state === 'running');
+  const terminal = ['done','skipped','warning','failed'];
+  const resolved = steps.filter(s=>terminal.includes(logged.get(s.key)?.state)).length;
+  const active = [...logged.values()].find(e => e.state === 'running');
   const groups = verifying ? verifyGroups : scanGroups;
   const groupRows = groups.map(([title, hint, keys], index) => {
     const members = steps.filter(s => keys.includes(s.key));
     if (!members.length) return '';
-    const ended = members.filter(s => ['done','skipped'].includes(logged.get(s.key)?.state));
+    const ended = members.filter(s => terminal.includes(logged.get(s.key)?.state));
+    const issue = members.map(s=>logged.get(s.key)?.state).find(v=>v==='failed'||v==='warning');
     const running = members.some(s => logged.get(s.key)?.state === 'running');
     const finished = ended.length === members.length;
     const skipped = finished && ended.every(s => logged.get(s.key).state === 'skipped');
-    const code = running ? 'running' : skipped ? 'skipped' : finished ? 'done' : 'pending';
+    const code = issue || (running ? 'running' : skipped ? 'skipped' : finished ? 'done' : 'pending');
     const names = members.map(s => {
       const event = logged.get(s.key);
-      return '<div class="moduleLine"><span>'+esc(s.name)+'</span><small>'+esc(event?.note || (s.off ? '配置已关闭' : '待执行'))+'</small></div>';
+      return '<div class="moduleLine"><span>'+esc(s.name)+'</span><small>'+esc(event?.note || statusText[event?.state] || (s.off ? '配置已关闭' : '待执行'))+'</small></div>';
     }).join('');
     return '<details class="flowRow '+code+'" data-group="'+index+'" '+(openGroup===index?'open':'')+'><summary><span class="flowNode">'+
       (code==='done'?'✓':code==='skipped'?'–':String(index+1).padStart(2,'0'))+'</span><span class="flowLabel"><strong>'+title+'</strong><small>'+
       esc(running ? active?.name : hint)+'</small></span><span class="flowStatus">'+
-      (running?'进行中':skipped?'已跳过':finished?'已完成':members.length+' 个模块')+'</span><span class="chev">⌄</span></summary>'+names+'</details>';
+      (issue?statusText[issue]:running?'进行中':skipped?'已跳过':finished?'已完成':members.length+' 个模块')+'</span><span class="chev">⌄</span></summary>'+names+'</details>';
   }).join('');
   const percent = Math.round(resolved / steps.length * 100);
   $('monitorState').textContent = statusText[state] || '待命';
@@ -78,7 +80,7 @@ function drawMonitor() {
       $('monitor').querySelectorAll('[data-group]').forEach(item => { item.open = Number(item.dataset.group) === openGroup; });
     };
   });
-  $('monitorFoot').textContent = !current ? '管线预览 · 展开阶段可查看智能体' : active ? '当前模块 · '+active.name : state==='done'?'回放结束 · '+current.name:'等待验证请求';
+  $('monitorFoot').textContent = !current ? '管线预览 · 展开阶段可查看智能体' : active ? '当前模块 · '+active.name : state==='failed'?current.error:state==='done'?'执行完成 · '+current.name:state==='running'?'正在启动执行器':'等待验证请求';
 }
 
 function locationOf(f) {
@@ -89,7 +91,7 @@ function badge(type, label) {
   return '<span class="badge '+esc(type)+'">'+esc(label)+'</span>';
 }
 function field(title, value) {
-  return '<div class="fact"><small>'+title+'</small><span>'+esc(value || '—')+'</span></div>';
+  return '<div class="fact"><small>'+title+'</small><span>'+esc(value ?? '—')+'</span></div>';
 }
 function reviewData() {
   const archive = view==='archive';
@@ -105,13 +107,18 @@ function renderResults() {
   $('verifyTab').setAttribute('aria-pressed', String(isVerify));
   $('findingCount').textContent = records.length;
   $('verifyCount').textContent = checks.length;
-  const base = 'samples/'+kind;
-  $('actions').innerHTML = (complete ? '<a class="mini" target="_blank" rel="noopener" href="'+base+'/report.html">'+icon('file')+'完整挖掘报告 ↗</a>' : '') +
-    (verified && isVerify ? '<a class="mini" target="_blank" rel="noopener" href="'+base+'/verification.txt">验证报告 ↗</a>' : '') +
+  const base = archive ? 'samples/'+kind : '/api/jobs/'+current?.id;
+  const report = base+(archive?'/report.html':'/report');
+  const verifyReport = base+(archive?'/verification.txt':'/verify-report');
+  $('actions').innerHTML = (complete ? '<a class="mini" target="_blank" rel="noopener" href="'+report+'">'+icon('file')+'完整挖掘报告 ↗</a>' : '') +
+    (verified && isVerify ? '<a class="mini" target="_blank" rel="noopener" href="'+verifyReport+'">验证报告 ↗</a>' : '') +
     (!archive && complete && records.length ? '<button id="verifyAction" class="mini verifyBtn" '+(busy()?'disabled':'')+'>'+icon('shield')+(verified?'重新验证':'验证漏洞')+'</button>' : '');
   if ($('verifyAction')) $('verifyAction').onclick = verifyPrompt;
   if (!records.length || (isVerify && !checks.length)) {
-    $('results').innerHTML = empty(isVerify?'等待验证结果':'等待挖掘结果',isVerify?'完成挖掘后，点击「验证漏洞」查看每条 POC 的判定。':'可以创建一个任务，或直接打开一份已完成的样例。')+
+    const status = isVerify ? current?.verification : current?.status;
+    const title = status==='failed'?'执行失败':status==='done'?(isVerify?'没有可验证的 POC':'本次分析未发现符合条件的漏洞'):(isVerify?'等待验证结果':'等待挖掘结果');
+    const note = status==='failed'?current.error:status==='done'?'可打开本次运行的完整报告。':isVerify?'完成挖掘后可运行 POC 验证。':'提交任务后，这里会显示引擎生成的报告。';
+    $('results').innerHTML = empty(title,note)+
       (!current && !archive ? '<div class="quickCases">'+Object.entries(cases).map(([k,c])=>'<button data-case="'+k+'">'+icon(c.icon)+c.title+' ↗</button>').join('')+'</div>' : '');
     $('results').querySelectorAll('[data-case]').forEach(b=>b.onclick=()=>openCase(b.dataset.case));
     return;
@@ -121,7 +128,7 @@ function renderResults() {
     '<div class="riskFilters" role="group" aria-label="严重度筛选">'+options.map(k=>'<button data-risk="'+k+'" aria-pressed="'+(severity===k)+'">'+
       (k==='all'?'全部':severityText[k])+' <b>'+(k==='all'?records.length:records.filter(f=>f.severity===k).length)+'</b></button>').join('')+'</div></div>'+
     '<div class="evidenceSplit"><div id="findingList" class="findingList" aria-label="漏洞列表"></div><section id="inspector" class="inspector" aria-label="漏洞详情"></section></div>'+
-    '<div class="recordFoot">'+icon('file')+' 固定样例 · '+esc(kindName(kind))+' 实验记录</div>';
+    '<div class="recordFoot">'+icon('file')+' '+(archive?'固定样例 · '+esc(kindName(kind)):'本次运行 · '+esc(current.id))+'</div>';
   $('findingSearch').oninput = e => { query=e.target.value; drawList(); };
   $('results').querySelectorAll('[data-risk]').forEach(b=>b.onclick=()=>{
     severity=b.dataset.risk;
@@ -133,11 +140,12 @@ function renderResults() {
 function drawList() {
   const {records,checks} = reviewData();
   const term = query.trim().toLowerCase();
-  const filtered = records.filter(f=>(severity==='all'||f.severity===severity) &&
+  const eligible = resultTab==='verdicts' ? records.filter(f=>checks.some(r=>r.finding_id===f.id)) : records;
+  const filtered = eligible.filter(f=>(severity==='all'||f.severity===severity) &&
     [f.title,f.id,f.cwe,locationOf(f),f.location?.endpoint].join(' ').toLowerCase().includes(term));
   const selected = filtered.find(f=>f.id===selectedId) || filtered[0];
   selectedId = selected?.id || '';
-  $('findingList').innerHTML = '<div class="listCaption"><small>FINDINGS</small><span>'+filtered.length+' / '+records.length+'</span></div>'+
+  $('findingList').innerHTML = '<div class="listCaption"><small>FINDINGS</small><span>'+filtered.length+' / '+eligible.length+'</span></div>'+
     filtered.map(f=>{
       const verdict = checks.find(r=>r.finding_id===f.id);
       const label = resultTab==='verdicts' && verdict ? badge(verdict.verdict,verdictText[verdict.verdict]) : badge(f.severity,severityText[f.severity]);
@@ -161,7 +169,7 @@ function drawInspector(f, verdict) {
   let content;
   if(verifying && verdict){
     content='<div class="verdictLine">'+badge(verdict.verdict,verdictText[verdict.verdict])+'<b>POC 验证结论</b></div>'+
-      '<p class="evidenceText">'+esc(verdict.reason)+'</p><div class="facts">'+field('基线 HTTP',verdict.baseline?.status)+field('探测 HTTP',verdict.attack?.status)+'</div>'+field('样例靶场',verdict.target_url);
+      '<p class="evidenceText">'+esc(verdict.reason)+'</p><div class="facts">'+field('基线 HTTP',verdict.baseline?.status)+field('探测 HTTP',verdict.attack?.status)+'</div>'+field('验证靶场',verdict.target_url);
   }else if(section==='artifacts'){
     content=activeScript?'<div class="artifactTools"><label>工件 <select id="artifactSelect" aria-label="选择 POC 文件">'+scripts.map(([name])=>'<option '+(name===activeScript[0]?'selected':'')+'>'+esc(name)+'</option>').join('')+'</select></label><button class="mini" id="copyPoc">复制内容</button></div>'+
       '<pre tabindex="0" class="codeView"><code>'+esc(activeScript[1])+'</code></pre>':empty('没有 POC 工件','此条记录只包含分析证据。');
