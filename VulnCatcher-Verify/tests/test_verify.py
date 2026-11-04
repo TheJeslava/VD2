@@ -9,6 +9,7 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from sunset_verify.collector import collect_from_result
 from sunset_verify.config import VerifySettings
 from sunset_verify.pipeline import verify_result, verify_batch
 
@@ -125,6 +126,19 @@ class TestVerifier(unittest.TestCase):
             ))
             self.assertEqual(results[0].verdict, "verified")
             self.assertTrue(results[0].target_url.startswith(self.base))
+
+    def test_legacy_awvs_single_step_is_not_replayed_as_its_own_baseline(self):
+        attack = "GET /lab?q=attack HTTP/1.1\r\nHost: TARGET\r\n\r\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = {"findings": [{"id": "AWVS-1", "origin": "awvs", "poc": {
+                "steps": [{"step": 1, "request": attack}],
+                "scripts": {"awvs_request.http": attack},
+            }}]}
+            (root / "report.json").write_text(json.dumps(report), encoding="utf-8")
+            case, = collect_from_result(root, mode="zip", base=self.base + "/lab?q=clean")
+            self.assertEqual(case.attack.url, self.base + "/lab?q=attack")
+            self.assertEqual(case.baseline.url, self.base + "/lab")
 
     def test_external_host_is_blocked(self):
         with tempfile.TemporaryDirectory(prefix="verify-") as tmp:

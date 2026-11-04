@@ -123,7 +123,7 @@ def _step_request(step: dict[str, Any]) -> HttpRequest | None:
 def _resolve_url(value: str, base: str, endpoint: str) -> str:
     value = (value or "").strip()
     if value.startswith(("http://", "https://")):
-        if "TARGET" not in value and "target" not in urllib.parse.urlsplit(value).hostname:
+        if urllib.parse.urlsplit(value).hostname != "target":
             return value
     if not base:
         return value
@@ -138,20 +138,16 @@ def _resolve_url(value: str, base: str, endpoint: str) -> str:
                 path += "?" + split.query
         else:
             path = endpoint or "/" + path
-    if "TARGET" in path:
-        path = path.replace("http://TARGET:8080", origin).replace("https://TARGET:8443", origin)
-        path = path.replace("TARGET:8080", parsed_base.netloc).replace("TARGET", parsed_base.hostname or "localhost")
-    if path.startswith(("http://", "https://")):
-        return path
     prefix = parsed_base.path.rstrip("/")
-    if prefix and path.startswith(prefix + "/"):
+    request_path = path.partition("?")[0]
+    if prefix and (request_path == prefix or request_path.startswith(prefix + "/")):
         return origin + path
     segments = [part for part in prefix.split("/") if part]
     if path.startswith("/") and len(segments) >= 2 and path.startswith("/" + segments[0] + "/"):
         # The base is already a full endpoint (URL mode); the request path
         # includes the same context prefix, so do not prepend it again.
         return origin + path
-    if prefix and not (path == prefix or path.startswith(prefix + "/")):
+    if prefix:
         path = prefix + "/" + path.lstrip("/")
     return origin + (path if path.startswith("/") else "/" + path)
 
@@ -207,7 +203,8 @@ def collect_from_result(result_dir: Path, *, mode: str, base: str) -> list[PocCa
             attack = parse_raw_request(str(scripts["request.http"]))
         # AWVS report reimports use a distinct artifact name so that the
         # preserved scanner request is not confused with a generated POC.
-        if attack is None and scripts.get("awvs_request.http"):
+        legacy_awvs = attack is None and bool(scripts.get("awvs_request.http"))
+        if legacy_awvs:
             attack = parse_raw_request(str(scripts["awvs_request.http"]))
         if attack is None and scripts.get("poc.sh"):
             attack = parse_curl(str(scripts["poc.sh"]))
@@ -215,11 +212,15 @@ def collect_from_result(result_dir: Path, *, mode: str, base: str) -> list[PocCa
             continue
         endpoint = str((finding.get("location", {}) or {}).get("endpoint") or finding.get("endpoint") or "")
         target_url = _finding_target(finding, run, mode, base)
-        attack.url = _resolve_url(attack.url, target_url or base, endpoint)
-        if baseline is not None:
-            baseline.url = _resolve_url(baseline.url, target_url or base, endpoint)
-        for request in attack_sequence:
+        missing_control = legacy_awvs and (baseline is None or baseline == attack)
+        for request in attack_sequence or [attack]:
             request.url = _resolve_url(request.url, target_url or base, endpoint)
+        if missing_control:
+            # Older imports have only an attack step. Never use its payload as a control.
+            parsed = urllib.parse.urlsplit(attack.url)
+            baseline = HttpRequest(method="GET", url=parsed._replace(query="", fragment="").geturl())
+        elif baseline is not None:
+            baseline.url = _resolve_url(baseline.url, target_url or base, endpoint)
         cases.append(PocCase(
             result_dir=str(result_dir),
             finding_id=str(finding.get("id") or ""),

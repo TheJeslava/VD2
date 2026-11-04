@@ -229,20 +229,18 @@ def judge(case: PocCase, baseline: HttpEvidence, attack: HttpEvidence,
         return result
 
     if vtype == "xss":
-        payloads = ("<script>alert(1)</script>", "\"><svg/onload=alert(1)>", "<script>alert(document.domain)</script>")
+        if baseline.error:
+            result.verdict = "error"
+            result.reason = f"baseline request failed: {baseline.error}"
+            return result
+        payloads = ("<script>alert(1)</script>", "\"><svg/onload=alert(1)>", "<script>alert(document.domain)</script>", "<img src=x onerror=alert(1)>")
         for payload in payloads:
-            if payload in body and payload not in base:
+            if payload in attack.body and payload not in baseline.body:
                 result.verdict = "verified"
                 result.confidence = 0.9
                 result.markers = [payload]
                 result.reason = "unencoded script payload reflected in attack response"
                 return result
-        if "<script" in lowered and "<script" not in base_lower:
-            result.verdict = "verified"
-            result.confidence = 0.75
-            result.markers = ["<script"]
-            result.reason = "script tag appears in attack response but not baseline"
-            return result
         result.verdict = "rejected" if attack.status < 500 else "inconclusive"
         result.confidence = 0.6
         result.reason = "no unencoded script reflection observed"

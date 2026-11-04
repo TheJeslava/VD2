@@ -204,7 +204,8 @@ class Handler(BaseHTTPRequestHandler):
                     if job["status"] != "done":
                         raise ValueError("请先完成漏洞挖掘")
                     url = target(job["url"] if job["mode"] == "url" else meta.get("url", ""), True)
-                    job.update(verification="running", verificationEvents=[], verifiedCount=0, verifyUrl=url, error="")
+                    job.update(verification="running", verificationId=uuid.uuid4().hex, verificationEvents=[],
+                               verifiedCount=0, verifyUrl=url, error="")
                     phase = "verify"
                 save(job)
                 JOBS[job["id"]] = job

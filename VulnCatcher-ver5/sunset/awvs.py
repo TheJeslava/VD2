@@ -46,6 +46,7 @@ class AwvsVulnerability:
     payload: str = ""
     evidence: str = ""
     method: str = ""
+    baseline_request: str = ""
 
 
 _SEVERITY = {
@@ -156,7 +157,7 @@ def parse_report(path: Path) -> list[AwvsVulnerability]:
         cwe = str(item.get("cwe") or item.get("cwe_id") or "")
         results.append(AwvsVulnerability(
             name, url, severity, details, request, cwe,
-            raw=item,
+            baseline_request=str(item.get("baseline_request") or ""), raw=item,
             channel=str(item.get("channel") or item.get("injection_point") or ""),
             parameter=str(item.get("parameter") or item.get("param_name") or ""),
             payload=str(item.get("payload") or item.get("attack_payload") or ""),
@@ -234,13 +235,16 @@ def _poc_from_awvs(vuln: AwvsVulnerability) -> PocPlan:
             "该 POC 来自 AWVS 报告回灌，本管线未执行。\n"
         ),
     }
+    steps = []
+    if vuln.baseline_request:
+        steps.append({"step": 1, "action": "重放探针的基线请求", "request": vuln.baseline_request,
+                      "expected_response": "记录正常输入的响应"})
+    steps.append({"step": len(steps) + 1, "action": "重放 AWVS 记录的请求", "request": request,
+                  "expected_response": "复现 AWVS 报告中的问题"})
     plan = PocPlan(
         description=f"AWVS 外部扫描发现：{vuln.vt_name} @ {vuln.url}",
         preconditions=["AWVS 扫描已完成", "目标可达", "已获得授权"],
-        steps=[
-            {"step": 1, "action": "重放 AWVS 记录的请求", "request": request,
-             "expected_response": "复现 AWVS 报告中的问题"},
-        ],
+        steps=steps,
         payload="",
         impact=vuln.details[:1000] or "外部扫描器报告的安全问题，需人工复核。",
         cve_justification=f"AWVS 报告：{vuln.vt_name}；CWE={vuln.cwe or 'unknown'}。外部扫描结果仅作为佐证。",

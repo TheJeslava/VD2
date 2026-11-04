@@ -107,7 +107,7 @@ function setView(next) {
 $('browseCases').onclick=()=>setView('archive');
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 function loadHistory(){
- $('history').innerHTML=jobs.map(j=>'<button class="historyRow" data-job="'+esc(j.id)+'">'+icon(j.mode==='zip'?'archive':'globe')+'<div><strong>'+esc(j.name)+'</strong><small>'+stamp(j.created)+' · '+kindName(j.kind)+' · '+esc(j.id)+'</small></div><span class="pill">'+esc(statusText[j.verification==='running'?'running':j.status])+'</span></button>').join('')||empty('暂无任务记录','完成第一次分析后，可在此重新打开结果。');
+ $('history').innerHTML=jobs.map(j=>'<button class="historyRow" data-job="'+esc(j.id)+'">'+icon(j.mode==='zip'?'archive':'globe')+'<div><strong>'+esc(j.name)+'</strong><small>'+stamp(j.created)+' · '+kindName(j.kind)+' · '+esc(j.id)+'</small></div><span class="pill">'+esc(j.verification==='idle'?statusText[j.status]:'验证'+statusText[j.verification])+'</span></button>').join('')||empty('暂无任务记录','完成第一次分析后，可在此重新打开结果。');
  $('history').querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>{setView('work');openJob(b.dataset.job);});
 }
 const kindName = kind => ({zip:'ZIP 源码',url:'URL 探针',hybrid:'ZIP + URL'})[kind];
@@ -118,7 +118,9 @@ function setOnline(value){
  syncButton();
 }
 function syncButton(){
- $('start').disabled=!online||submitting||jobs.some(j=>j.status==='running'||j.verification==='running');
+ const occupied=jobs.some(j=>j.status==='running'||j.verification==='running');
+ $('start').disabled=!online||submitting||occupied;
+ if($('verifyAction'))$('verifyAction').disabled=!online||submitting||occupied||busy();
 }
 async function api(path, options){
  const response=await fetch(path,{cache:'no-store',...options});
@@ -204,7 +206,7 @@ async function refresh(ticket, choosePhase=false){
      const id=selectedJobId;
      const job=await api('/api/jobs/'+id);
      if(ticket!==selection)return;
-     const version=[id,job.status,job.verification,job.count,job.verifiedCount,job.error].join('/');
+     const version=[id,job.status,job.verification,job.verificationId,job.count,job.verifiedCount,job.error].join('/');
      if(version!==resultVersion){
        const [rows,checks]=await Promise.all([
          job.status==='done'?api('/api/jobs/'+id+'/findings'):[],
@@ -216,9 +218,9 @@ async function refresh(ticket, choosePhase=false){
        if(view==='work')renderResults();
      }else{current=job;}
      const progress=[version,job.events.length,job.verificationEvents.length].join('/');
-     if(progress!==monitorVersion){monitorVersion=progress;drawMonitor();}
+     if(!online || progress!==monitorVersion){monitorVersion=progress;drawMonitor();}
    }
-   if(!online){$('formError').textContent='';$('engineHelp').hidden=true;}
+   if(!online){$('formError').textContent='';$('engineHelp').hidden=true;if(!current)drawMonitor();}
    setOnline(true);
    if(view==='history'&&historyChanged)loadHistory();
  }catch(error){

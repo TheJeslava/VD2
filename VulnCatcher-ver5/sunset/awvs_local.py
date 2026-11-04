@@ -176,10 +176,8 @@ def _markers(category, attack, baseline):
         return (True, f"status {baseline.status}->{attack.status}", "server error") if attack.status >= 500 > baseline.status else (False, "", "")
     if category == "xss":
         for payload in _PAYLOADS["xss"]:
-            if payload in body and payload not in base:
+            if payload in attack.body and payload not in baseline.body:
                 return True, payload, "unencoded script reflection"
-        if re.search(r"document\.(location|URL)|innerHTML|eval\s*\(", lowered):
-            return True, "DOM source/sink", "unsafe DOM sink"
         return False, "", ""
     if category == "path_traversal":
         for marker in ("root:x:0:0", "[extensions]", "for 16-bit app support", "/tmp/sunset_probe", "../", "..\\"):
@@ -273,7 +271,10 @@ def scan_target(target, insecure=True, timeout=15.0):
         if hit:
             _, _, channel, parameter = _channel_value(target, payload)
             details = f"Local AWVS-compatible probe observed {reason}. baseline HTTP {baseline.status} ({len(baseline.body)} bytes); attack HTTP {attack.status} ({len(attack.body)} bytes); marker={marker!r}."
-            findings.append(_finding(category, target, url, details=details, request=attack.raw_request, channel=channel, parameter=parameter, payload=payload, evidence=marker))
+            finding = _finding(category, target, url, details=details, request=attack.raw_request,
+                               channel=channel, parameter=parameter, payload=payload, evidence=marker)
+            finding.baseline_request = baseline.raw_request
+            findings.append(finding)
             break
     # Manifest metadata describes the probe channel and expected test family;
     # it must never fabricate a vulnerability when the live response provides

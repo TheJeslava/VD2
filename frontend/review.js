@@ -113,7 +113,7 @@ function renderResults() {
   $('actions').innerHTML = (complete ? '<a class="mini" target="_blank" rel="noopener" href="'+report+'">'+icon('file')+'完整挖掘报告 ↗</a>' : '') +
     (verified && isVerify ? '<a class="mini" target="_blank" rel="noopener" href="'+verifyReport+'">验证报告 ↗</a>' : '') +
     (!archive && complete && records.length ? '<button id="verifyAction" class="mini verifyBtn" '+(busy()?'disabled':'')+'>'+icon('shield')+(verified?'重新验证':'验证漏洞')+'</button>' : '');
-  if ($('verifyAction')) $('verifyAction').onclick = verifyPrompt;
+  if ($('verifyAction')) { $('verifyAction').onclick = verifyPrompt; syncButton(); }
   if (!records.length || (isVerify && !checks.length)) {
     const status = isVerify ? current?.verification : current?.status;
     const title = status==='failed'?'执行失败':status==='done'?(isVerify?'没有可验证的 POC':'本次分析未发现符合条件的漏洞'):(isVerify?'等待验证结果':'等待挖掘结果');

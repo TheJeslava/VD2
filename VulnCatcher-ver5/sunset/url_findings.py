@@ -200,7 +200,9 @@ def build_url_poc(vuln: AwvsVulnerability, target_url: str) -> PocPlan:
     payload = vuln.payload or _extract_payload(parsed, channel, parameter)
     safe = _safe_value_for(vuln_type)
     baseline_raw = raw
-    if payload:
+    if vuln.baseline_request:
+        baseline_raw = _raw_with_target(vuln.baseline_request, "TARGET")
+    elif payload:
         baseline_raw = raw.replace(urllib.parse.quote(payload, safe=""), urllib.parse.quote(safe, safe=""))
         baseline_raw = baseline_raw.replace(payload, safe)
     baseline_curl = _raw_to_curl(baseline_raw, "TARGET:8080")
